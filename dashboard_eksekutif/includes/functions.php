@@ -1,9 +1,4 @@
 <?php
-/*
- * File functions.php (UPDATE V2)
- * Berisi semua fungsi helper terpusat.
- */
-
 // 1. Fungsi Format Rupiah
 function formatRupiah($angka) {
     $hasil_rupiah = "Rp " . number_format($angka, 0, ',', '.');

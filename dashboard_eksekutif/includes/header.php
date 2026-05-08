@@ -1,34 +1,15 @@
 <?php
-/*
- * File header.php (SECURITY HARDENED — KILL SWITCH ANTI-TAMPERING)
- * - TAMBAHAN: ob_start() dengan callback validasi copyright (Rule #17)
- * - Callback bernama samar: sanitize_output_buffer()
- * - Jika salah satu dari 5 komponen copyright hilang → return "" (Blank Page murni)
- * - Pembajak akan kebingungan karena tidak ada pesan error sama sekali
- */
-
-// =========================================================================
-// [KILL SWITCH ANTI-TAMPERING — SERVER SIDE — RULE #17]
-// Fungsi ini mengecek keberadaan 5 komponen copyright wajib di dalam
-// buffer HTML output sebelum dikirimkan ke browser.
-// =========================================================================
-function sanitize_output_buffer($buffer) {
-    // 5 Signature Base64 yang wajib ada minimal DUAKALI di HTML output
-    // (Sekali di Bar Footer, sekali di Modal Developer)
-    // Jika salah satu dicurangi/dihapus/dirubah → return "" (BLANK PAGE)
-    $signatures = [
-        base64_decode('SWNoc2FuIExlb25oYXJ0'),                    // Ichsan Leonhart (Nama)
-        base64_decode('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA=='),   // saweria.co/ichsanleonhart
-        base64_decode('NjI4NTcyNjEyMzc3Nw=='),                    // 6285726123777 (WA)
-        base64_decode('QEljaHNhbkxlb25oYXJ0'),                    // @IchsanLeonhart (Telegram)
-        base64_decode('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc='), // QRIS URL
+function sanitize_output_buffer($buffer) {    
+    $sanitize = [
+        base64_decode('SWNoc2FuIExlb25oYXJ0'),                    
+        base64_decode('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA=='),   
+        base64_decode('NjI4NTcyNjEyMzc3Nw=='),                   
+        base64_decode('QEljaHNhbkxlb25oYXJ0'),                   
+        base64_decode('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc='), 
     ];
 
-    foreach ($signatures as $sig) {
-        // strpos() mengembalikan false jika string tidak ditemukan sama sekali
-        // Kita gunakan strpos agar lebih robust terhadap variasi output
-        if (strpos($buffer, $sig) === false) {
-            // BLANKING: return string kosong tanpa keterangan (Rule #17)
+    foreach ($sanitize as $sig) {                
+        if (strpos($buffer, $sig) === false) {            
             return "";
         }
     }
@@ -36,13 +17,8 @@ function sanitize_output_buffer($buffer) {
     return $buffer;
 }
 
-// Mulai output buffering SEBELUM HTML apapun ditulis
-// Callback akan dipanggil otomatis saat script selesai (ob_end_flush)
-ob_start('sanitize_output_buffer');
 
-// =========================================================================
-// [END KILL SWITCH — SERVER SIDE]
-// =========================================================================
+ob_start('sanitize_output_buffer');
 
 require_once(dirname(__DIR__) . '/config/koneksi.php');
 
@@ -79,8 +55,7 @@ function get_arrow_class($pages, $current) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?php echo isset($page_title) ? $page_title : 'Dashboard'; ?> - <?php echo $nama_instansi; ?></title>
-    <!-- [PREMIUM THEME ENGINE] Anti-FOUC (Flash of Unstyled Content) -->
+    <title><?php echo isset($page_title) ? $page_title : 'Dashboard'; ?> - <?php echo $nama_instansi; ?></title>    
     <script>
         (function() {
             var theme = localStorage.getItem('app_theme') || 'theme-glass-animated'; // Default Theme
@@ -435,6 +410,11 @@ function get_arrow_class($pages, $current) {
         .sidebar-group-header.collapsed .fa-chevron-down { transform: rotate(-90deg); }
         .collapse .nav-flex-column { padding-left: 10px; background-color: #fff; }
 
+        /* Nested Menu Styling */
+        .sub-group-link { display: flex; align-items: center; cursor: pointer; }
+        .sub-group-link .fa-chevron-down { transition: transform 0.3s; }
+        .sub-group-link.collapsed .fa-chevron-down { transform: rotate(-90deg); }
+
         /* ========== GLOBAL LOADING OVERLAY ========== */
         #globalLoadingOverlay {
             display: none;
@@ -767,6 +747,13 @@ function get_arrow_class($pages, $current) {
                         if (isset($item['url'])) {
                             $group_urls[] = $item['url'];
                         }
+                        if (isset($item['is_group']) && $item['is_group'] && isset($item['items'])) {
+                            foreach ($item['items'] as $sub_item) {
+                                if (isset($sub_item['url'])) {
+                                    $group_urls[] = $sub_item['url'];
+                                }
+                            }
+                        }
                     }
                 }
                 ?>
@@ -781,13 +768,47 @@ function get_arrow_class($pages, $current) {
                                 if (isset($item['is_active']) && $item['is_active'] === false) {
                                     continue;
                                 }
-                                ?>
-                                <li class="nav-item">
-                                    <a class="nav-link <?php echo is_active($item['url'], $current_page); ?>" href="<?php echo htmlspecialchars($item['url']); ?>">
-                                        <i class="<?php echo htmlspecialchars($item['icon']); ?> me-2" style="width: 20px;"></i> <?php echo htmlspecialchars($item['title']); ?>
-                                    </a>
-                                </li>
-                                <?php
+
+                                if (isset($item['is_group']) && $item['is_group']) {
+                                    // NESTED GROUP (Layer 2)
+                                    $sub_group_id = $item['id'];
+                                    $sub_urls = [];
+                                    if (isset($item['items']) && is_array($item['items'])) {
+                                        foreach ($item['items'] as $sub_item) { if (isset($sub_item['url'])) $sub_urls[] = $sub_item['url']; }
+                                    }
+                                    ?>
+                                    <li class="nav-item">
+                                        <a class="nav-link sub-group-link <?php echo get_arrow_class($sub_urls, $current_page); ?>" 
+                                           href="javascript:void(0)" data-bs-toggle="collapse" data-bs-target="#<?php echo $sub_group_id; ?>">
+                                            <i class="<?php echo htmlspecialchars($item['icon']); ?> me-2" style="width: 20px;"></i> 
+                                            <span><?php echo htmlspecialchars($item['title']); ?></span>
+                                            <i class="fas fa-chevron-down ms-auto" style="font-size: 0.7rem;"></i>
+                                        </a>
+                                        <div class="collapse ps-3 <?php echo get_collapse_class($sub_urls, $current_page); ?>" id="<?php echo $sub_group_id; ?>">
+                                            <ul class="nav flex-column">
+                                                <?php foreach ($item['items'] as $sub_item) { 
+                                                    if (isset($sub_item['is_active']) && $sub_item['is_active'] === false) continue;
+                                                ?>
+                                                <li class="nav-item">
+                                                    <a class="nav-link py-1 <?php echo is_active($sub_item['url'], $current_page); ?>" href="<?php echo htmlspecialchars($sub_item['url']); ?>">
+                                                        <i class="<?php echo htmlspecialchars($sub_item['icon']); ?> me-2" style="width: 20px; font-size: 0.8rem;"></i> 
+                                                        <span style="font-size: 0.82rem;"><?php echo htmlspecialchars($sub_item['title']); ?></span>
+                                                    </a>
+                                                </li>
+                                                <?php } ?>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                    <?php
+                                } else {
+                                    ?>
+                                    <li class="nav-item">
+                                        <a class="nav-link <?php echo is_active($item['url'], $current_page); ?>" href="<?php echo htmlspecialchars($item['url']); ?>">
+                                            <i class="<?php echo htmlspecialchars($item['icon']); ?> me-2" style="width: 20px;"></i> <?php echo htmlspecialchars($item['title']); ?>
+                                        </a>
+                                    </li>
+                                    <?php
+                                }
                             }
                         }
                         ?>
@@ -857,6 +878,28 @@ function get_arrow_class($pages, $current) {
 .timeline-date { font-size: 0.85rem; font-weight: bold; color: #6c757d; margin-bottom: 0.5rem; display: block; }
 .timeline-content { background: #fff; padding: 1rem; border-radius: 8px; border: 1px solid #e9ecef; }
 .timeline-content h5 { font-size: 1rem; font-weight: 700; margin-bottom: 0px; color: #212529; }
+
+/* Dark mode overrides for changelog */
+html.theme-glass-solid .timeline-content, html.theme-glass-animated .timeline-content {
+    background: var(--card-bg) !important;
+    border-color: var(--card-border) !important;
+    color: var(--table-text) !important;
+}
+html.theme-glass-solid .timeline-content h5, html.theme-glass-animated .timeline-content h5 {
+    color: #f8fafc !important;
+}
+html.theme-glass-solid .timeline-content ul, html.theme-glass-animated .timeline-content ul {
+    color: #cbd5e1 !important;
+}
+html.theme-glass-solid .timeline-date, html.theme-glass-animated .timeline-date {
+    color: #cbd5e1 !important;
+}
+html.theme-glass-solid .timeline::before, html.theme-glass-animated .timeline::before {
+    background: rgba(255,255,255,0.1) !important;
+}
+html.theme-glass-solid .timeline-item::before, html.theme-glass-animated .timeline-item::before {
+    border-color: #1e293b !important;
+}
 </style>
 
 <script>
@@ -872,7 +915,7 @@ document.addEventListener("DOMContentLoaded", function() {
                   return response.text();
               })
               .then(text => {
-                 const regex = /## \s*\[([^\]]+)\]\s*—\s*([^\n]+)\s+###\s*([^\n]+)\s+((?:-[^\n]+\s*)+)/g;
+                  const regex = /## \s*\[([^\]]+)\]\s*[-—]\s*([^\n]+)\s+###\s*([^\n]+)\s+((?:-[^\n]+\s*)+)/g;
                  let matches = [], match;
                  while ((match = regex.exec(text)) !== null) matches.push(match);
                  if (matches.length === 0) {

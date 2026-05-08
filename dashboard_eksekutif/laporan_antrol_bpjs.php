@@ -83,6 +83,9 @@ $sql = "SELECT
     pj.png_jawab,
     d.nm_dokter,
     mpb.nm_poli_bpjs AS `Poliklinik`,
+    pl.nm_poli AS `poli_rs`,
+    COALESCE(jdl.jam_praktek, '-') AS `jadwal`,
+    COALESCE(jdl.kuota_jadwal, 0) AS `kuota`,
     IFNULL(rmj.status, 'On Site') AS `Status Checkin MJKN`,    
     DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '1' THEN rmjt.waktu END), '%H:%i:%s') AS `log TID_1`,
     DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '2' THEN rmjt.waktu END), '%H:%i:%s') AS `log TID_2`,    
@@ -111,7 +114,26 @@ FROM reg_periksa rp
 LEFT JOIN penjab pj ON rp.kd_pj = pj.kd_pj
 LEFT JOIN pasien ps ON rp.no_rkm_medis = ps.no_rkm_medis
 LEFT JOIN dokter d ON rp.kd_dokter = d.kd_dokter
+LEFT JOIN poliklinik pl ON rp.kd_poli = pl.kd_poli
 LEFT JOIN maping_poli_bpjs mpb ON rp.kd_poli = mpb.kd_poli_rs
+LEFT JOIN (
+    SELECT 
+        kd_dokter, kd_poli, hari_kerja, 
+        GROUP_CONCAT(CONCAT(DATE_FORMAT(jam_mulai, '%H:%i'), '-', DATE_FORMAT(jam_selesai, '%H:%i')) SEPARATOR ', ') as jam_praktek,
+        SUM(kuota) as kuota_jadwal
+    FROM jadwal 
+    GROUP BY kd_dokter, kd_poli, hari_kerja
+) jdl ON rp.kd_dokter = jdl.kd_dokter 
+    AND rp.kd_poli = jdl.kd_poli 
+    AND jdl.hari_kerja = (CASE DAYNAME(rp.tgl_registrasi)
+        WHEN 'Monday' THEN 'SENIN'
+        WHEN 'Tuesday' THEN 'SELASA'
+        WHEN 'Wednesday' THEN 'RABU'
+        WHEN 'Thursday' THEN 'KAMIS'
+        WHEN 'Friday' THEN 'JUMAT'
+        WHEN 'Saturday' THEN 'SABTU'
+        WHEN 'Sunday' THEN 'AKHAD'
+    END)
 LEFT JOIN referensi_mobilejkn_bpjs_taskid rmjt ON rp.no_rawat = rmjt.no_rawat
 LEFT JOIN referensi_mobilejkn_bpjs rmj ON rp.no_rawat = rmj.no_rawat
 LEFT JOIN mutasi_berkas mb ON rp.no_rawat = mb.no_rawat
@@ -210,7 +232,12 @@ if ($stmt = $koneksi->prepare($sql)) {
                 <td>{$row['tgl_registrasi']}</td>
                 <td><strong>{$row['no_rawat']}</strong> {$mjkn_badge}</td>
                 <td>{$row['nm_pasien']}<br><small class='text-muted'>{$row['nm_dokter']}</small></td>
-                <td>{$row['Poliklinik']}</td>
+                <td>
+                    <span class='fw-bold'>{$row['Poliklinik']}</span><br>
+                    <small class='text-muted'>{$row['poli_rs']}</small><br>
+                    <span class='badge bg-info text-dark' style='font-size:0.65rem;'><i class='fas fa-clock me-1'></i>{$row['jadwal']}</span>
+                    <span class='badge bg-secondary' style='font-size:0.65rem;' title='Kuota Sesi'><i class='fas fa-users me-1'></i>{$row['kuota']}</span>
+                </td>
                 <td>$b3</td>
                 <td>$b4</td>
                 <td>$b5</td>
@@ -229,7 +256,7 @@ if ($stmt = $koneksi->prepare($sql)) {
 
             $tableRowsRaw .= "<tr>
                 <td><strong>{$row['no_rawat']}</strong> {$mjkn_badge}</td>
-                <td>{$row['nm_pasien']}</td>
+                <td>{$row['nm_pasien']}<br><small class='text-muted'>Jadwal: {$row['jadwal']} (Q:{$row['kuota']})</small></td>
                 <td>$c3</td>
                 <td>$c4</td>
                 <td>$c5</td>
@@ -389,7 +416,7 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
                             <th>Terdaftar (Tgl)</th>
                             <th>No Rawat / Nomer Antrean</th>
                             <th>Pasien / Dokter</th>
-                            <th>Poli</th>
+                            <th>Poli & Jadwal Praktek</th>
                             <th>[3] Admisi</th>
                             <th>[4] CPPT</th>
                             <th>[5] End Layan</th>
@@ -418,7 +445,7 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
                     <thead class="table-light">
                         <tr>
                             <th width="12%">No Rawat</th>
-                            <th width="15%">Nama Pasien</th>
+                            <th width="20%">Pasien & Sesi Jadwal</th>
                             <th>Task 3 (Admisi)</th>
                             <th>Task 4 (Awal Medis)</th>
                             <th>Task 5 (Selesai Medis)</th>

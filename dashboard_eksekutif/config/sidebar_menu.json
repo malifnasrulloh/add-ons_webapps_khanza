@@ -2,7 +2,7 @@
     {
         "id": "grp_biaya",
         "is_group": true,
-        "title": "Kendali Biaya",
+        "title": "📉 Kendali Biaya",
         "is_active": true,
         "items": [
             {
@@ -22,7 +22,7 @@
     {
         "id": "grp_keuangan",
         "is_group": true,
-        "title": "Laporan Keuangan",
+        "title": "💰 Laporan Keuangan",
         "is_active": true,
         "items": [
             {
@@ -66,13 +66,89 @@
                 "title": "Jasa Medis",
                 "icon": "fas fa-user-tie",
                 "is_active": true
+            },
+            {
+                "id": "sub_accounting",
+                "is_group": true,
+                "title": "📊 Accounting",
+                "icon": "fas fa-calculator",
+                "is_active": true,
+                "items": [
+                    {
+                        "url": "akuntansi_dashboard.php",
+                        "title": "Executive Summary",
+                        "icon": "fas fa-tachometer-alt",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_opex.php",
+                        "title": "OpEx Deep Dive",
+                        "icon": "fas fa-fire-alt",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_rasio.php",
+                        "title": "Analisis Rasio",
+                        "icon": "fas fa-percentage",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_neraca_saldo.php",
+                        "title": "Neraca Saldo Visual",
+                        "icon": "fas fa-balance-scale",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_komparatif.php",
+                        "title": "Analisis Komparatif",
+                        "icon": "fas fa-not-equal",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_jurnal.php",
+                        "title": "Jurnal Harian",
+                        "icon": "fas fa-book-open",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_bubes.php",
+                        "title": "Buku Besar",
+                        "icon": "fas fa-book",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_cashflow.php",
+                        "title": "Cash Flow",
+                        "icon": "fas fa-water",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_cashflow_direct.php",
+                        "title": "Direct Cash Flow",
+                        "icon": "fas fa-exchange-alt",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_keuangan.php",
+                        "title": "Laporan Keuangan",
+                        "icon": "fas fa-chart-pie",
+                        "is_active": true
+                    },
+                    {
+                        "url": "akuntansi_rekening_tahun.php",
+                        "title": "Rekening Tahunan",
+                        "icon": "fas fa-calendar-alt",
+                        "is_active": true
+                    }
+                ]
             }
+
         ]
     },
     {
         "id": "grp_hrd",
         "is_group": true,
-        "title": "Administrasi & HRD",
+        "title": "👥 Administrasi & HRD",
         "is_active": true,
         "items": [
             {
@@ -86,7 +162,7 @@
     {
         "id": "grp_stat",
         "is_group": true,
-        "title": "Statistik & Indikator",
+        "title": "📈 Statistik & Indikator",
         "is_active": true,
         "items": [
             {
@@ -136,7 +212,7 @@
     {
         "id": "grp_kpi",
         "is_group": true,
-        "title": "Key Performance",
+        "title": "🏆 Key Performance",
         "is_active": true,
         "items": [
             {
@@ -156,7 +232,7 @@
     {
         "id": "grp_farmasi",
         "is_group": true,
-        "title": "Manajemen Farmasi",
+        "title": "💊 Manajemen Farmasi",
         "is_active": true,
         "items": [
             {
@@ -194,7 +270,7 @@
     {
         "id": "grp_erm",
         "is_group": true,
-        "title": "Kelengkapan ERM",
+        "title": "📋 Kelengkapan ERM",
         "is_active": true,
         "items": [
             {

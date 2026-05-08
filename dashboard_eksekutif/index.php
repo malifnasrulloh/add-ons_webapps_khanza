@@ -192,6 +192,14 @@ if (isset($koneksi)) {
         .timeline-content { background: #fff; padding: 1rem; border-radius: 8px; border: 1px solid #e9ecef; color: #212529; }
         .timeline-content h5 { font-size: 1rem; font-weight: 700; margin-bottom: 0; }
         .modal-changelog-body { background-color: #f8f9fa; }
+
+        /* Dark mode overrides for changelog (if theme glass applied on index) */
+        html.theme-glass-solid .timeline-content, html.theme-glass-animated .timeline-content { background: var(--card-bg) !important; border-color: var(--card-border) !important; color: var(--table-text) !important; }
+        html.theme-glass-solid .timeline-content h5, html.theme-glass-animated .timeline-content h5 { color: #f8fafc !important; }
+        html.theme-glass-solid .timeline-content ul, html.theme-glass-animated .timeline-content ul { color: #cbd5e1 !important; }
+        html.theme-glass-solid .timeline-date, html.theme-glass-animated .timeline-date { color: #cbd5e1 !important; }
+        html.theme-glass-solid .timeline::before, html.theme-glass-animated .timeline::before { background: rgba(255,255,255,0.1) !important; }
+        html.theme-glass-solid .timeline-item::before, html.theme-glass-animated .timeline-item::before { border-color: #1e293b !important; }
     </style>
 </head>
 <body>
@@ -344,7 +352,7 @@ document.addEventListener("DOMContentLoaded", function() {
                   return r.text();
               })
               .then(function(text) {
-                 var regex = /## \s*\[([^\]]+)\]\s*—\s*([^\n]+)\s+###\s*([^\n]+)\s+((?:-[^\n]+\s*)+)/g;
+                 var regex = /## \s*\[([^\]]+)\]\s*[-—]\s*([^\n]+)\s+###\s*([^\n]+)\s+((?:-[^\n]+\s*)+)/g;
                  var matches = [], m;
                  while ((m = regex.exec(text)) !== null) matches.push(m);
                  if (matches.length === 0) {

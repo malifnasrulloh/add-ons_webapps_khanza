@@ -162,17 +162,7 @@ if (isset($page_js)) {
     echo $page_js;
 }
 ?>
-
-<!-- =========================================================================
-     [KILL SWITCH — CLIENT SIDE — RULE #17]
-     Script ini di-obfuskat menggunakan PHP base64_encode() pada render time.
-     Berjalan via setInterval setiap 2 detik.
-     Mengecek visibility element Saweria (id=dev-saweria-link) & QRIS (id=dev-qris-img)
-     via window.getComputedStyle(). Jika salah satu disembunyikan (display:none,
-     visibility:hidden, opacity mendekati 0) → document.body.innerHTML dikosongkan.
-======================================================================== -->
 <?php
-// JS Kill Switch asli (plain text) — di-encode ke Base64 oleh PHP saat render
 $_ks_js = "
 (function(){
     'use strict';
@@ -213,13 +203,9 @@ $_ks_js = "
     }, 2000);
 })();
 ";
-// Encode ke Base64 dan inject sebagai eval(atob('...'))
-// Pembajak yang melihat source akan kesulitan membaca logikanya
 echo '<script>eval(atob("' . base64_encode($_ks_js) . '"));</' . 'script>';
 ?>
-<!-- ===== END KILL SWITCH CLIENT SIDE ===== -->
 
-<!-- Modal Developer / "Curhat" Monetisasi -->
 <div class="modal fade" id="devMessageModal" tabindex="-1" aria-labelledby="devMessageModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">

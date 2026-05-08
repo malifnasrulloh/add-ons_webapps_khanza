@@ -109,11 +109,81 @@ include 'includes/header.php';
 </style>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
-    <h1 class="h2"><i class="fas fa-user-clock text-primary me-2"></i> Laporan Absensi & Kedisiplinan</h1>
+    <h1 class="h2"><i class="fas fa-user-clock text-primary me-2"></i> Laporan Absensi &amp; Kedisiplinan</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-        <!-- Setting Denda dihapus sesuai request untuk menyederhanakan konfigurasi -->
+        <?php if(isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin'): ?>
+        <button class="btn btn-sm btn-outline-warning fw-bold" onclick="openMigrasiModal()">
+            <i class="fas fa-database me-1"></i> Migrasi Schema DB
+        </button>
+        <?php endif; ?>
     </div>
 </div>
+
+<?php if(isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin'): ?>
+<!-- =============================================================
+     SUPERADMIN PANEL: Migrasi Schema Database Jadwal
+     Menambahkan nilai ENUM 'Libur' & 'Cuti' pada tabel:
+       - jadwal_pegawai  (h1-h31)
+       - jadwal_tambahan (h1-h31)
+       - rekap_presensi  (shift)
+       - temporary_presensi (shift)
+============================================================== -->
+<div class="modal fade" id="modalMigrasi" tabindex="-1" aria-labelledby="labelMigrasi" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" style="border:2px solid #ffc107; border-radius:16px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#856404,#ffc107); color:#fff; border-radius:14px 14px 0 0;">
+        <h5 class="modal-title" id="labelMigrasi">
+          <i class="fas fa-database me-2"></i> Migrasi Schema DB &mdash; Khanza Custom Edition
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning py-2 small mb-3">
+          <i class="fas fa-exclamation-triangle me-1"></i>
+          <strong>Superadmin Only.</strong> Panel ini menjalankan <code>ALTER TABLE</code> untuk menambahkan
+          nilai ENUM <code>'Libur'</code> dan <code>'Cuti'</code> pada kolom jadwal &amp; presensi.
+          Diperlukan agar Khanza Custom Edition dapat mencatat jadwal Libur/Cuti tanpa error MySQL.
+        </div>
+
+        <div class="table-responsive mb-1">
+          <table class="table table-sm small mb-0">
+            <thead class="table-secondary"><tr>
+              <th>Tabel yang Diperiksa</th><th>Keterangan Modifikasi</th>
+            </tr></thead>
+            <tbody>
+              <tr><td class="font-monospace">jadwal_pegawai</td><td>31 kolom h1&ndash;h31: tambah <code>'Libur','Cuti'</code> ke ENUM</td></tr>
+              <tr><td class="font-monospace">jadwal_tambahan</td><td>31 kolom h1&ndash;h31: tambah <code>'Libur','Cuti'</code> ke ENUM</td></tr>
+              <tr><td class="font-monospace">rekap_presensi</td><td>Kolom <code>shift</code>: tambah <code>'Libur','Cuti'</code> ke ENUM</td></tr>
+              <tr><td class="font-monospace">temporary_presensi</td><td>Kolom <code>shift</code>: tambah <code>'Libur','Cuti'</code> ke ENUM</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h6 class="fw-bold text-secondary mt-3 mb-2"><i class="fas fa-search-plus me-1"></i> Status Deteksi:</h6>
+        <div id="migrasiStatusArea">
+          <div class="text-center py-3">
+            <div class="spinner-border text-warning spinner-border-sm"></div>
+            <span class="ms-2 small text-muted">Memeriksa schema database...</span>
+          </div>
+        </div>
+
+        <div id="migrasiLogArea" class="mt-3" style="display:none;">
+          <h6 class="fw-bold text-secondary mb-2"><i class="fas fa-terminal me-1"></i> Log Eksekusi:</h6>
+          <div id="migrasiLogContent"
+               class="font-monospace small bg-dark text-light p-3 rounded"
+               style="max-height:220px; overflow-y:auto; white-space:pre-wrap;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i> Tutup</button>
+        <button class="btn btn-warning fw-bold" id="btnJalankanMigrasi" onclick="jalankanMigrasi()" disabled>
+          <i class="fas fa-play-circle me-1"></i> Jalankan Migrasi
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <!-- FILTER PANEL -->
 <div class="filter-panel d-flex flex-wrap gap-3 align-items-end">
@@ -419,6 +489,73 @@ include 'includes/header.php';
         chartPie.update();
     }
 
+    // ─── Superadmin: Migrasi Schema DB ───────────────────────────────────────
+    function openMigrasiModal() {
+        $('#migrasiStatusArea').html('<div class="text-center py-3"><div class="spinner-border text-warning spinner-border-sm"></div> Memeriksa schema...</div>');
+        $('#migrasiLogArea').hide();
+        $('#btnJalankanMigrasi').prop('disabled', true);
+        var modal = new bootstrap.Modal(document.getElementById('modalMigrasi'));
+        modal.show();
+
+        $.getJSON('api/db_migrate_jadwal.php?act=status', function(res) {
+            if (!res.success) {
+                $('#migrasiStatusArea').html('<div class="alert alert-danger small">' + (res.message || 'Error') + '</div>');
+                return;
+            }
+            var html = '<div class="table-responsive"><table class="table table-sm table-bordered small mb-0">';
+            html += '<thead class="table-dark"><tr><th>Tabel</th><th class="text-center">Kolom Diperiksa</th><th class="text-center">Sudah OK</th><th class="text-center">Status</th></tr></thead><tbody>';
+            var needsMigration = false;
+            $.each(res.status, function(key, s) {
+                var badge = s.needs_migration
+                    ? '<span class="badge bg-danger">Perlu Migrasi</span>'
+                    : '<span class="badge bg-success">✓ Up-to-date</span>';
+                if (s.needs_migration) needsMigration = true;
+                html += '<tr>';
+                html += '<td class="font-monospace fw-bold">' + s.label + '</td>';
+                html += '<td class="text-center">' + s.columns_total + '</td>';
+                html += '<td class="text-center">' + s.columns_ok + '</td>';
+                html += '<td class="text-center">' + badge + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            $('#migrasiStatusArea').html(html);
+            if (needsMigration) {
+                $('#btnJalankanMigrasi').prop('disabled', false);
+            } else {
+                $('#migrasiStatusArea').append('<div class="alert alert-success mt-2 py-2 small mb-0"><i class="fas fa-check-circle me-1"></i> Semua tabel sudah up-to-date. Tidak ada migrasi diperlukan.</div>');
+            }
+        }).fail(function(xhr) {
+            $('#migrasiStatusArea').html('<div class="alert alert-danger small">Gagal menghubungi server: ' + (xhr.responseText || xhr.status) + '</div>');
+        });
+    }
+
+    function jalankanMigrasi() {
+        $('#btnJalankanMigrasi').prop('disabled', true).html('<div class="spinner-border spinner-border-sm me-1"></div> Memproses...');
+        $.getJSON('api/db_migrate_jadwal.php?act=migrate', function(res) {
+            $('#migrasiLogArea').show();
+            var logHtml = '';
+            if (res.logs && res.logs.length > 0) {
+                logHtml += res.logs.map(l => '<div>' + l + '</div>').join('');
+            }
+            if (res.errors && res.errors.length > 0) {
+                logHtml += res.errors.map(e => '<div class="text-danger fw-bold">' + e + '</div>').join('');
+            }
+            $('#migrasiLogContent').html(logHtml || '<div class="text-muted">Tidak ada output.</div>');
+            $('#migrasiLogContent').scrollTop($('#migrasiLogContent')[0].scrollHeight);
+
+            if (res.success) {
+                $('#btnJalankanMigrasi').html('<i class="fas fa-check me-1"></i> Selesai').addClass('btn-success').removeClass('btn-warning');
+                // Refresh status
+                setTimeout(openMigrasiModal, 1500);
+            } else {
+                $('#btnJalankanMigrasi').prop('disabled', false).html('<i class="fas fa-play-circle me-1"></i> Coba Lagi');
+                Swal.fire('Migrasi Gagal', 'Ada error pada ALTER TABLE. Lihat log di atas.', 'error');
+            }
+        }).fail(function(xhr) {
+            $('#btnJalankanMigrasi').prop('disabled', false).html('<i class="fas fa-play-circle me-1"></i> Jalankan Migrasi');
+            Swal.fire('Error', 'Gagal menghubungi server migrasi.', 'error');
+        });
+    }
 </script>
 <?php
 $page_js = ob_get_clean();

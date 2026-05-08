@@ -42,6 +42,9 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="bangsal-tab" data-bs-toggle="tab" data-bs-target="#bangsal" type="button" role="tab">Per Bangsal</button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="kelas-tab" data-bs-toggle="tab" data-bs-target="#kelas" type="button" role="tab">Per Kelas</button>
+        </li>
     </ul>
 
     <div class="tab-content" id="myTabContent">
@@ -172,6 +175,42 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                 </div>
             </div>
         </div>
+        <div class="tab-pane fade" id="kelas" role="tabpanel">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Catatan:</strong> Laporan ini mengelompokkan indikator berdasarkan kelas kamar dengan kriteria filtering otomatis sebagai berikut:
+                        <ul class="mb-0 mt-2">
+                            <li><strong>Bed Bayi:</strong> Terdeteksi jika nama bangsal mengandung kata <code>'bayi'</code> atau <code>'box bayi'</code>.</li>
+                            <li><strong>Isolasi:</strong> Terdeteksi jika nama bangsal mengandung kata <code>'isolasi'</code>.</li>
+                            <li><strong>Intensive:</strong> Terdeteksi jika nama bangsal mengandung kata <code>'ICU'</code> atau <code>'HCU'</code> (NICU, PICU, etc).</li>
+                            <li><strong>Prioritas:</strong> Sistem menggunakan logika <em>mutually exclusive</em> dengan urutan prioritas: Bed Bayi > Isolasi > Intensive > Enum Kelas Kamar. Hal ini menjamin tidak terjadi dobel hitung antar kategori.</li>
+                        </ul>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="table-kelas" class="table table-striped table-bordered table-hover" style="width:100%">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Grup / Kelas Kamar</th>
+                                    <th class="text-center">Bed (TT)</th>
+                                    <th class="text-center">Hari Rawat (HP)</th>
+                                    <th class="text-center">Pasien Keluar (D)</th>
+                                    <th class="text-center">BOR (%)</th>
+                                    <th class="text-center">ALOS</th>
+                                    <th class="text-center">TOI</th>
+                                    <th class="text-center">BTO</th>
+                                    <th class="text-center">NDR</th>
+                                    <th class="text-center">GDR</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
 		
 		<div class="card shadow-sm">
                 <div class="card-header">
@@ -230,6 +269,7 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 <?php ob_start(); ?>
 <script>
     var tableBangsal;
+    var tableKelas;
 
     $(document).ready(function() {
         // Init DataTables untuk Bangsal
@@ -243,6 +283,29 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
             ],
             "columns": [
                 { "data": "bangsal" },
+                { "data": "bed", className: "text-center" },
+                { "data": "hp", className: "text-center" },
+                { "data": "d", className: "text-center" },
+                { "data": "bor", className: "text-center fw-bold" },
+                { "data": "alos", className: "text-center" },
+                { "data": "toi", className: "text-center" },
+                { "data": "bto", className: "text-center" },
+                { "data": "ndr", className: "text-center" },
+                { "data": "gdr", className: "text-center" }
+            ]
+        });
+
+        // Init DataTables untuk Kelas
+        tableKelas = $('#table-kelas').DataTable({
+            "responsive": true,
+            "dom": 'Bfrtip',
+            "buttons": [
+                { extend: 'excelHtml5', className: 'btn btn-success btn-sm', title: 'Laporan Indikator Per Kelas' },
+                { extend: 'pdfHtml5', className: 'btn btn-danger btn-sm', title: 'Laporan Indikator Per Kelas' },
+                { extend: 'print', className: 'btn btn-secondary btn-sm' }
+            ],
+            "columns": [
+                { "data": "kelas" },
                 { "data": "bed", className: "text-center" },
                 { "data": "hp", className: "text-center" },
                 { "data": "d", className: "text-center" },
@@ -292,6 +355,20 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                 tableBangsal.draw();
             },
             error: function() { console.error("Gagal memuat data bangsal"); }
+        });
+
+        // 3. Load Data Per Kelas
+        $.ajax({
+            url: 'api/data_indikator_per_kelas.php',
+            type: 'GET',
+            data: { tgl_awal: tglAwal, tgl_akhir: tglAkhir },
+            dataType: 'json',
+            success: function(response) {
+                tableKelas.clear();
+                tableKelas.rows.add(response.data);
+                tableKelas.draw();
+            },
+            error: function() { console.error("Gagal memuat data kelas"); }
         });
     }
 

@@ -34,8 +34,17 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 
 ---
 
-## 💰 4. Laporan Keuangan (Audit Omzet & Kas)
-*Bagian ini digunakan untuk audit transaksi yang sudah terjadi (Billing selesai).*
+## 💰 4. Laporan Keuangan & Akuntansi Tingkat Dewa
+*Bagian ini digunakan untuk audit transaksi, rekap kas, hingga analisis kesehatan finansial RS secara menyeluruh dengan fitur Helicopter View (Drill-Down 4 Level).*
+
+*   **Helicopter View (Drill-Down 4 Level)**: Ini adalah fitur canggih di mana kamu bisa menelusuri data dari rekap hingga ke akar transaksi (Nomor Bukti Jurnal). Cukup klik baris data pada tabel (Neraca Saldo / Cashflow / Rasio), maka akan muncul rincian **Buku Besar**. Klik lagi pada rincian Buku Besar untuk melihat **Detail Jurnal** hariannya!
+![Helicopter View - Drill Down](57. Arus kas c - audit trail.jpg)
+
+*   **Neraca Saldo**: Laporan keseimbangan total Debet dan Kredit dari seluruh akun/rekening. Dilengkapi dengan perhitungan Saldo Awal dan Mutasi yang sangat presisi (Zero Margin of Error).
+![Neraca Saldo](59. neraca saldo.jpg)
+
+*   **Rasio Keuangan & Cashflow**: Pantau indikator kesehatan finansial RS (Rasio Lancar, Profitabilitas, dll) secara instan. Beban dan Pendapatan terkalibrasi otomatis dari jurnal!
+![Rasio Keuangan](58. Rasio Keuangan.jpg)
 
 *   **Laporan Kas**: Rekapitulasi uang yang benar-benar ada di tangan (tunai di brankas/kasir).
 ![Laporan Kas](5. Laporan Kas.jpg)
@@ -66,6 +75,9 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 *   **Laporan Absensi**: Pantau kedisiplinan pegawai, dari jam masuk, keterlambatan, hingga rekapitulasi ketidakhadiran secara visual.
 ![Dashboard Analytics Absensi](19. Dashboard analitics Absensi.jpg)
 ![Rekap Keterlambatan](18. Rekap keterlambatan Pegawai.jpg)
+
+*   **Superadmin: Migrasi Schema Jadwal DB**: Khusus buat Super Admin! Kalo nemuin Laporan Absensi Khanza error pas ada yang jadwalnya "Libur" atau "Cuti", klik tombol "Migrasi Schema DB" di halaman Laporan Absensi. Sistem bakal otomatis beresin table database (ALTER TABLE ENUM) tanpa perlu buka PhpMyAdmin!
+![Migrasi Schema DB]([Screenshot: superadmin_migrasi_db.jpg])
 
 ---
 
