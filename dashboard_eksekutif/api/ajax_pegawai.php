@@ -12,37 +12,36 @@ error_reporting(0);
 header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
 
-$koneksi->query("SET sql_mode = ''");
-
-// Ambil parameter pencarian dan validasi ketat
-$search = isset($_GET['q']) ? trim($_GET['q']) : '';
-
 $data = [];
 
-if (!empty($search) && strlen($search) >= 2) {
-    // --- FIX SQL INJECTION: Prepared Statement dengan wildcard LIKE ---
-    // Wildcard % ditempatkan di dalam nilai bind_param, bukan di query string
-    $like_param = '%' . $search . '%';
+try {
+    $koneksi_pdo->exec("SET sql_mode = ''");
 
-    $stmt = $koneksi->prepare(
-        "SELECT nik, nama FROM pegawai WHERE nik LIKE ? OR nama LIKE ? LIMIT 20"
-    );
-    $stmt->bind_param("ss", $like_param, $like_param);
-    $stmt->execute();
-    $res = $stmt->get_result();
+    // Ambil parameter pencarian dan validasi ketat
+    $search = isset($_GET['q']) ? trim($_GET['q']) : '';
 
-    if ($res) {
-        while ($row = $res->fetch_assoc()) {
+    if (!empty($search) && strlen($search) >= 2) {
+        // --- FIX SQL INJECTION: Prepared Statement dengan wildcard LIKE ---
+        // Wildcard % ditempatkan di dalam nilai bind_param, bukan di query string
+        $like_param = '%' . $search . '%';
+
+        $stmt = $koneksi_pdo->prepare(
+            "SELECT nik, nama FROM pegawai WHERE nik LIKE :search1 OR nama LIKE :search2 LIMIT 20"
+        );
+        $stmt->execute([':search1' => $like_param, ':search2' => $like_param]);
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $data[] = [
                 'id'   => htmlspecialchars($row['nik']),  // value (username)
                 'text' => htmlspecialchars($row['nik'] . ' - ' . $row['nama']) // label
             ];
         }
     }
-    $stmt->close();
+} catch (PDOException $e) {
+    // Return empty array on failure for safe default
+    $data = [];
 }
 
 ob_end_clean();
 echo json_encode($data);
-$koneksi->close();
 ?>

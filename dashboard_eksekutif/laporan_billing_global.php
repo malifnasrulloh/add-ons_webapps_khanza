@@ -294,9 +294,11 @@ if ($is_search) {
         </div>
     </div>
     <?php else: ?>
-        <div class="alert alert-secondary text-center p-5">
-            <h4>Silakan pilih filter tanggal dan klik "Tampilkan Data"</h4>
-            <p>Data tidak dimuat otomatis untuk menjaga performa aplikasi.</p>
+        <div class="card shadow-sm mb-4">
+            <div class="card-body text-center p-5">
+                <h4 class="text-primary">Silakan pilih filter tanggal dan klik "Tampilkan Data"</h4>
+                <p class="text-muted mb-0">Data tidak dimuat otomatis untuk menjaga performa aplikasi.</p>
+            </div>
         </div>
     <?php endif; ?>
 </div>

@@ -1,6 +1,6 @@
 <?php
 /*
- * File: api/hitung_estimasi_ranap.php
+ * File: api/hitung_estimasi_ranap.php (SECURITY HARDENED - PDO)
  * Fungsi: Menghitung estimasi biaya satu pasien Ranap secara on-demand (Lazy Loading).
  * Logika: PERSIS SAMA dengan blok kalkulasi di data_kunjungan_ranap.php (V9 PARITY)
  */
@@ -9,7 +9,6 @@ ob_start();
 ini_set('display_errors', 0);
 error_reporting(0);
 set_time_limit(30);
-mysqli_report(MYSQLI_REPORT_OFF);
 
 header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
@@ -21,8 +20,8 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$no_rawat = isset($_GET['no_rawat']) ? $koneksi->real_escape_string(trim($_GET['no_rawat'])) : '';
-$kd_pj    = isset($_GET['kd_pj'])    ? $koneksi->real_escape_string(trim($_GET['kd_pj']))    : '-';
+$no_rawat = isset($_GET['no_rawat']) ? trim($_GET['no_rawat']) : '';
+$kd_pj    = isset($_GET['kd_pj'])    ? trim($_GET['kd_pj'])    : '-';
 
 if (empty($no_rawat)) {
     ob_end_clean();
@@ -35,201 +34,267 @@ function safeFloat_r($val) {
     if (is_null($val) || $val === '') return 0.0;
     return (float)$val;
 }
-function safe_q($conn, $sql) {
-    $res = $conn->query($sql);
-    return ($res === false) ? false : $res;
-}
 
-// ===== LOAD GLOBAL SETTINGS (identik data_kunjungan_ranap.php) =====
-$setting_kamar = ['hariawal' => 'no', 'lamajam' => 0];
-$q_jam = safe_q($koneksi, "SELECT hariawal, lamajam FROM set_jam_minimal LIMIT 1");
-if ($q_jam && $r_jam = $q_jam->fetch_assoc()) $setting_kamar = $r_jam;
+try {
+    // ===== LOAD GLOBAL SETTINGS =====
+    $setting_kamar = ['hariawal' => 'no', 'lamajam' => 0];
+    try {
+        $stmt = $koneksi_pdo->query("SELECT hariawal, lamajam FROM set_jam_minimal LIMIT 1");
+        if ($r_jam = $stmt->fetch(PDO::FETCH_ASSOC)) $setting_kamar = $r_jam;
+    } catch (PDOException $e) {}
 
-$tampilkan_ppn_ranap = false;
-$q_set = safe_q($koneksi, "SELECT tampilkan_ppnobat_ranap FROM set_nota LIMIT 1");
-if ($q_set && $r_set = $q_set->fetch_assoc()) {
-    if ($r_set['tampilkan_ppnobat_ranap'] == 'Yes') $tampilkan_ppn_ranap = true;
-}
+    $tampilkan_ppn_ranap = false;
+    try {
+        $stmt = $koneksi_pdo->query("SELECT tampilkan_ppnobat_ranap FROM set_nota LIMIT 1");
+        if ($r_set = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if ($r_set['tampilkan_ppnobat_ranap'] == 'Yes') $tampilkan_ppn_ranap = true;
+        }
+    } catch (PDOException $e) {}
 
-$service_umum = null; $service_piutang = null;
-$q_su = safe_q($koneksi, "SELECT * FROM set_service_ranap LIMIT 1");
-if ($q_su) $service_umum = $q_su->fetch_assoc();
-$q_sp = safe_q($koneksi, "SELECT * FROM set_service_ranap_piutang LIMIT 1");
-if ($q_sp) $service_piutang = $q_sp->fetch_assoc();
+    $service_umum = null; $service_piutang = null;
+    try {
+        $stmt = $koneksi_pdo->query("SELECT * FROM set_service_ranap LIMIT 1");
+        if ($r_su = $stmt->fetch(PDO::FETCH_ASSOC)) $service_umum = $r_su;
+    } catch (PDOException $e) {}
+    
+    try {
+        $stmt = $koneksi_pdo->query("SELECT * FROM set_service_ranap_piutang LIMIT 1");
+        if ($r_sp = $stmt->fetch(PDO::FETCH_ASSOC)) $service_piutang = $r_sp;
+    } catch (PDOException $e) {}
 
-// ===== KALKULASI BIAYA (PERSIS SAMA dengan data_kunjungan_ranap.php V9) =====
-$grand_total = 0.0;
-$sum_kamar = 0; $sum_reg = 0;
-$sum_dr_ralan = 0; $sum_pr_ralan = 0;
-$sum_dr_ranap = 0; $sum_pr_ranap = 0;
-$sum_lab = 0; $sum_rad = 0; $sum_op = 0; $sum_obat = 0;
-$sum_retur = 0; $sum_tambah = 0; $sum_potong = 0; $sum_harian = 0;
+    // ===== KALKULASI BIAYA =====
+    $grand_total = 0.0;
+    $sum_kamar = 0; $sum_reg = 0;
+    $sum_dr_ralan = 0; $sum_pr_ralan = 0;
+    $sum_dr_ranap = 0; $sum_pr_ranap = 0;
+    $sum_lab = 0; $sum_rad = 0; $sum_op = 0; $sum_obat = 0;
+    $sum_retur = 0; $sum_tambah = 0; $sum_potong = 0; $sum_harian = 0;
 
-// A. Registrasi
-$q = safe_q($koneksi, "SELECT biaya_reg FROM reg_periksa WHERE no_rawat='$no_rawat'");
-if ($q && $r = $q->fetch_assoc()) {
-    $val = safeFloat_r($r['biaya_reg']);
-    if ($val > 0) { $sum_reg += $val; $grand_total += $val; }
-}
+    // A. Registrasi
+    try {
+        $stmt = $koneksi_pdo->prepare("SELECT biaya_reg FROM reg_periksa WHERE no_rawat = :no_rawat");
+        $stmt->execute([':no_rawat' => $no_rawat]);
+        if ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $val = safeFloat_r($r['biaya_reg']);
+            if ($val > 0) { $sum_reg += $val; $grand_total += $val; }
+        }
+    } catch (PDOException $e) {}
 
-// B. Kamar Inap (History Mode)
-$q_hist_kamar = safe_q($koneksi, "SELECT k.kd_kamar, k.trf_kamar, ki.tgl_masuk, ki.tgl_keluar, ki.lama, ki.ttl_biaya FROM kamar_inap ki JOIN kamar k ON ki.kd_kamar = k.kd_kamar WHERE ki.no_rawat='$no_rawat'");
-if ($q_hist_kamar) {
-    while ($rhk = $q_hist_kamar->fetch_assoc()) {
-        $tgl_masuk  = $rhk['tgl_masuk'];
-        $tgl_keluar = ($rhk['tgl_keluar'] != '0000-00-00') ? $rhk['tgl_keluar'] : date('Y-m-d');
-        $d1 = new DateTime($tgl_masuk); $d2 = new DateTime($tgl_keluar);
-        $diff = $d2->diff($d1);
-        $hari_raw = $diff->days;
+    // B. Kamar Inap (History Mode)
+    try {
+        $stmt = $koneksi_pdo->prepare("SELECT k.kd_kamar, k.trf_kamar, ki.tgl_masuk, ki.tgl_keluar, ki.lama, ki.ttl_biaya FROM kamar_inap ki JOIN kamar k ON ki.kd_kamar = k.kd_kamar WHERE ki.no_rawat = :no_rawat");
+        $stmt->execute([':no_rawat' => $no_rawat]);
+        while ($rhk = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $tgl_masuk  = $rhk['tgl_masuk'];
+            $tgl_keluar = ($rhk['tgl_keluar'] != '0000-00-00') ? $rhk['tgl_keluar'] : date('Y-m-d');
+            $d1 = new DateTime($tgl_masuk); $d2 = new DateTime($tgl_keluar);
+            $diff = $d2->diff($d1);
+            $hari_raw = $diff->days;
 
-        if ($setting_kamar['hariawal'] == 'yes') $hari = $hari_raw + 1;
-        else $hari = $hari_raw;
+            if ($setting_kamar['hariawal'] == 'yes') $hari = $hari_raw + 1;
+            else $hari = $hari_raw;
 
-        if (safeFloat_r($rhk['ttl_biaya']) > 0 && safeFloat_r($rhk['lama']) > 0) $hari = safeFloat_r($rhk['lama']);
+            if (safeFloat_r($rhk['ttl_biaya']) > 0 && safeFloat_r($rhk['lama']) > 0) $hari = safeFloat_r($rhk['lama']);
 
-        $biaya_satu_kamar = $hari * safeFloat_r($rhk['trf_kamar']);
-        if ($biaya_satu_kamar > 0) { $sum_kamar += $biaya_satu_kamar; $grand_total += $biaya_satu_kamar; }
+            $biaya_satu_kamar = $hari * safeFloat_r($rhk['trf_kamar']);
+            if ($biaya_satu_kamar > 0) { $sum_kamar += $biaya_satu_kamar; $grand_total += $biaya_satu_kamar; }
 
-        $kd_k = $koneksi->real_escape_string($rhk['kd_kamar']);
-        $q_bs = safe_q($koneksi, "SELECT SUM(besar_biaya) as tot FROM biaya_sekali WHERE kd_kamar='$kd_k'");
-        if ($q_bs && $row_bs = $q_bs->fetch_assoc()) { $val = safeFloat_r($row_bs['tot']); $sum_harian += $val; $grand_total += $val; }
+            $kd_k = $rhk['kd_kamar'];
+            
+            try {
+                $stmt_bs = $koneksi_pdo->prepare("SELECT SUM(besar_biaya) as tot FROM biaya_sekali WHERE kd_kamar = :kd_kamar");
+                $stmt_bs->execute([':kd_kamar' => $kd_k]);
+                if ($row_bs = $stmt_bs->fetch(PDO::FETCH_ASSOC)) { 
+                    $val = safeFloat_r($row_bs['tot']); 
+                    $sum_harian += $val; 
+                    $grand_total += $val; 
+                }
+            } catch (PDOException $e) {}
 
-        $q_bh = safe_q($koneksi, "SELECT SUM(besar_biaya) as tot FROM biaya_harian WHERE kd_kamar='$kd_k'");
-        if ($q_bh && $row_bh = $q_bh->fetch_assoc()) { $val = ($hari * safeFloat_r($row_bh['tot'])); $sum_harian += $val; $grand_total += $val; }
+            try {
+                $stmt_bh = $koneksi_pdo->prepare("SELECT SUM(besar_biaya) as tot FROM biaya_harian WHERE kd_kamar = :kd_kamar");
+                $stmt_bh->execute([':kd_kamar' => $kd_k]);
+                if ($row_bh = $stmt_bh->fetch(PDO::FETCH_ASSOC)) { 
+                    $val = ($hari * safeFloat_r($row_bh['tot'])); 
+                    $sum_harian += $val; 
+                    $grand_total += $val; 
+                }
+            } catch (PDOException $e) {}
+        }
+    } catch (PDOException $e) {}
+
+    // C. Operasi
+    try {
+        $stmt = $koneksi_pdo->prepare("SELECT * FROM operasi WHERE no_rawat = :no_rawat");
+        $stmt->execute([':no_rawat' => $no_rawat]);
+        while ($r_op = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $komponen = ['biayaoperator1','biayaoperator2','biayaoperator3','biayaasisten_operator1','biayaasisten_operator2','biayadokter_anestesi','biayaasisten_anestesi','biayasewaok','biayaalat','akomodasi','bagian_rs','biaya_omloop','biayasarpras','biaya_dokter_anak','biayaperawaat_resusitas','biayabidan'];
+            foreach ($komponen as $k) {
+                if (isset($r_op[$k])) { $val = safeFloat_r($r_op[$k]); $sum_op += $val; }
+            }
+        }
+    } catch (PDOException $e) {}
+    $grand_total += $sum_op;
+
+    // D. Tindakan
+    $tindakan_tables = [
+        ['periksa_lab', 'biaya', 'lab'],
+        ['periksa_radiologi', 'biaya', 'rad'],
+        ['rawat_jl_dr', 'biaya_rawat', 'dr_ralan'],
+        ['rawat_jl_pr', 'biaya_rawat', 'pr_ralan'],
+        ['rawat_jl_drpr', 'biaya_rawat', 'dr_ralan'],
+        ['rawat_inap_dr', 'biaya_rawat', 'dr_ranap'],
+        ['rawat_inap_pr', 'biaya_rawat', 'pr_ranap'],
+        ['rawat_inap_drpr', 'biaya_rawat', 'dr_ranap'],
+        ['tambahan_biaya', 'besar_biaya', 'tambah'],
+        ['pengurangan_biaya', 'besar_pengurangan', 'potong']
+    ];
+
+    foreach ($tindakan_tables as $t) {
+        $tbl = $t[0]; $col = $t[1]; $grp = $t[2];
+        try {
+            $stmt = $koneksi_pdo->prepare("SELECT SUM($col) as tot FROM $tbl WHERE no_rawat = :no_rawat");
+            $stmt->execute([':no_rawat' => $no_rawat]);
+            if ($rt = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $val = safeFloat_r($rt['tot']);
+                if ($val != 0) {
+                    if ($grp == 'lab')      $sum_lab     += $val;
+                    elseif ($grp == 'rad')  $sum_rad     += $val;
+                    elseif ($grp == 'dr_ralan') $sum_dr_ralan += $val;
+                    elseif ($grp == 'pr_ralan') $sum_pr_ralan += $val;
+                    elseif ($grp == 'dr_ranap') $sum_dr_ranap += $val;
+                    elseif ($grp == 'pr_ranap') $sum_pr_ranap += $val;
+                    elseif ($grp == 'tambah')   $sum_tambah   += $val;
+                    elseif ($grp == 'potong') { 
+                        $sum_potong += (-1 * abs($val)); 
+                        $grand_total += (-1 * abs($val)); 
+                        continue; 
+                    }
+                    $grand_total += $val;
+                }
+            }
+        } catch (PDOException $e) {}
     }
-}
 
-// C. Operasi (PHP Loop — Aman dari Typo SQL)
-$q_op = safe_q($koneksi, "SELECT * FROM operasi WHERE no_rawat='$no_rawat'");
-if ($q_op) {
-    while ($r_op = $q_op->fetch_assoc()) {
-        $komponen = ['biayaoperator1','biayaoperator2','biayaoperator3','biayaasisten_operator1','biayaasisten_operator2','biayadokter_anestesi','biayaasisten_anestesi','biayasewaok','biayaalat','akomodasi','bagian_rs','biaya_omloop','biayasarpras','biaya_dokter_anak','biayaperawaat_resusitas','biayabidan'];
-        foreach ($komponen as $k) {
-            if (isset($r_op[$k])) { $val = safeFloat_r($r_op[$k]); $sum_op += $val; }
+    // E. Obat & Retur
+    $obat_tables = [
+        ['detail_pemberian_obat', 'total'],
+        ['tagihan_obat_langsung', 'besar_tagihan']
+    ];
+    foreach ($obat_tables as $t) {
+        try {
+            $stmt = $koneksi_pdo->prepare("SELECT SUM(" . $t[1] . ") as tot FROM " . $t[0] . " WHERE no_rawat = :no_rawat");
+            $stmt->execute([':no_rawat' => $no_rawat]);
+            if ($ro = $stmt->fetch(PDO::FETCH_ASSOC)) $sum_obat += safeFloat_r($ro['tot']);
+        } catch (PDOException $e) {}
+    }
+    
+    try {
+        $stmt = $koneksi_pdo->prepare("SELECT SUM(hargasatuan * jumlah) as tot FROM beri_obat_operasi WHERE no_rawat = :no_rawat");
+        $stmt->execute([':no_rawat' => $no_rawat]);
+        if ($ro = $stmt->fetch(PDO::FETCH_ASSOC)) $sum_obat += safeFloat_r($ro['tot']);
+    } catch (PDOException $e) {}
+
+    $grand_total += $sum_obat;
+
+    try {
+        $stmt = $koneksi_pdo->prepare("SELECT SUM(r.jml * d.ralan) as tot FROM returpasien r JOIN databarang d ON r.kode_brng = d.kode_brng WHERE r.no_rawat = :no_rawat");
+        $stmt->execute([':no_rawat' => $no_rawat]);
+        if ($rr = $stmt->fetch(PDO::FETCH_ASSOC)) $sum_retur += abs(safeFloat_r($rr['tot']));
+    } catch (PDOException $e) {}
+    $grand_total -= $sum_retur;
+
+    // F. PPN
+    if ($tampilkan_ppn_ranap) {
+        $obat_bersih = $sum_obat - $sum_retur;
+        if ($obat_bersih > 0) $grand_total += round($obat_bersih * 0.11);
+    }
+
+    // G. Jasa Admin (Service)
+    $s = null;
+    if ($kd_pj != '-' && $kd_pj != 'UMUM' && $kd_pj != 'A01') $s = $service_piutang;
+    else $s = $service_umum;
+
+    if ($s) {
+        $basis = 0;
+        if ($s['laborat']          == 'Yes') $basis += $sum_lab;
+        if ($s['radiologi']        == 'Yes') $basis += $sum_rad;
+        if ($s['operasi']          == 'Yes') $basis += $sum_op;
+        if ($s['obat']             == 'Yes') $basis += ($sum_obat - $sum_retur);
+        if ($s['ranap_dokter']     == 'Yes') $basis += $sum_dr_ranap;
+        if ($s['ranap_paramedis']  == 'Yes') $basis += $sum_pr_ranap;
+        if ($s['ralan_dokter']     == 'Yes') $basis += $sum_dr_ralan;
+        if ($s['ralan_paramedis']  == 'Yes') $basis += $sum_pr_ralan;
+        if ($s['tambahan']         == 'Yes') $basis += $sum_tambah;
+        if ($s['potongan']         == 'Yes') $basis += $sum_potong;
+        if ($s['kamar']            == 'Yes') $basis += $sum_kamar;
+        if ($s['registrasi']       == 'Yes') $basis += $sum_reg;
+        if ($s['harian']           == 'Yes') $basis += $sum_harian;
+
+        $persen = safeFloat_r($s['besar']);
+        if ($basis > 0 && $persen > 0) {
+            $jasa_admin = round($basis * ($persen / 100));
+            
+            try {
+                $stmt = $koneksi_pdo->prepare("SELECT totalbiaya FROM billing WHERE no_rawat = :no_rawat AND (nm_perawatan LIKE '%Administrasi%' OR nm_perawatan LIKE '%Service%')");
+                $stmt->execute([':no_rawat' => $no_rawat]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                if (count($rows) == 0) {
+                    $grand_total += $jasa_admin;
+                } else {
+                    foreach ($rows as $row_bill) $grand_total += safeFloat_r($row_bill['totalbiaya']);
+                }
+            } catch (PDOException $e) {}
         }
     }
-}
-$grand_total += $sum_op;
 
-// D. Tindakan (UNION Mode)
-$sql_tind = "SELECT 'lab' as grp, SUM(biaya) as tot FROM periksa_lab WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'rad', SUM(biaya) FROM periksa_radiologi WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'dr_ralan', SUM(biaya_rawat) FROM rawat_jl_dr WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'pr_ralan', SUM(biaya_rawat) FROM rawat_jl_pr WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'dr_ralan', SUM(biaya_rawat) FROM rawat_jl_drpr WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'dr_ranap', SUM(biaya_rawat) FROM rawat_inap_dr WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'pr_ranap', SUM(biaya_rawat) FROM rawat_inap_pr WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'dr_ranap', SUM(biaya_rawat) FROM rawat_inap_drpr WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'tambah', SUM(besar_biaya) FROM tambahan_biaya WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT 'potong', SUM(besar_pengurangan) FROM pengurangan_biaya WHERE no_rawat='$no_rawat'";
-$q_tind = safe_q($koneksi, $sql_tind);
-if ($q_tind) {
-    while ($rt = $q_tind->fetch_assoc()) {
-        $val = safeFloat_r($rt['tot']); $grp = $rt['grp'];
-        if ($val != 0) {
-            if ($grp == 'lab')      $sum_lab     += $val;
-            elseif ($grp == 'rad')  $sum_rad     += $val;
-            elseif ($grp == 'dr_ralan') $sum_dr_ralan += $val;
-            elseif ($grp == 'pr_ralan') $sum_pr_ralan += $val;
-            elseif ($grp == 'dr_ranap') $sum_dr_ranap += $val;
-            elseif ($grp == 'pr_ranap') $sum_pr_ranap += $val;
-            elseif ($grp == 'tambah')   $sum_tambah   += $val;
-            elseif ($grp == 'potong') { $sum_potong += (-1 * abs($val)); $grand_total += (-1 * abs($val)); continue; }
-            $grand_total += $val;
+    // DPJP
+    $dpjp = '';
+    $is_dpjp_fallback = false;
+    try {
+        $stmt = $koneksi_pdo->prepare("SELECT d.nm_dokter FROM dpjp_ranap dr JOIN dokter d ON dr.kd_dokter = d.kd_dokter WHERE dr.no_rawat = :no_rawat LIMIT 1");
+        $stmt->execute([':no_rawat' => $no_rawat]);
+        if ($rd = $stmt->fetch(PDO::FETCH_ASSOC)) $dpjp = $rd['nm_dokter'];
+        else $is_dpjp_fallback = true;
+    } catch (PDOException $e) {}
+
+    // H. Plafon
+    $plafon_val = 0;
+    $has_plafon  = false;
+    try {
+        $stmt = $koneksi_pdo->prepare("SELECT tarif FROM perkiraan_biaya_ranap WHERE no_rawat = :no_rawat LIMIT 1");
+        $stmt->execute([':no_rawat' => $no_rawat]);
+        if ($r_plafon = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!is_null($r_plafon['tarif']) && $r_plafon['tarif'] !== '') {
+                $plafon_val = safeFloat_r($r_plafon['tarif']);
+                $has_plafon = ($plafon_val > 0);
+            }
         }
-    }
+    } catch (PDOException $e) {}
+
+    $selisih_val = $grand_total - $plafon_val;
+    $is_over     = ($has_plafon && $grand_total > $plafon_val);
+    $pct         = ($has_plafon && $plafon_val > 0) ? min(100, round(($grand_total / $plafon_val) * 100)) : 0;
+
+    ob_end_clean();
+    echo json_encode([
+        'no_rawat'         => $no_rawat,
+        'estimasi'         => number_format($grand_total, 0, ',', '.'),
+        'estimasi_raw'     => $grand_total,
+        'plafon'           => $has_plafon ? ('Rp ' . number_format($plafon_val, 0, ',', '.')) : '-',
+        'plafon_raw'       => $plafon_val,
+        'has_plafon'       => $has_plafon,
+        'selisih'          => $has_plafon ? ('Rp ' . number_format(abs($selisih_val), 0, ',', '.')) : '-',
+        'selisih_raw'      => $has_plafon ? $selisih_val : null,
+        'is_over'          => $is_over,
+        'pct'              => $pct,
+        'dpjp'             => $dpjp,
+        'is_dpjp_fallback' => $is_dpjp_fallback,
+    ]);
+
+} catch (Exception $e) {
+    ob_end_clean();
+    http_response_code(500);
+    echo json_encode(['error' => 'Server Error: ' . $e->getMessage()]);
 }
-
-// E. Obat & Retur
-$sql_obat = "SELECT SUM(total) as tot FROM detail_pemberian_obat WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT SUM(besar_tagihan) FROM tagihan_obat_langsung WHERE no_rawat='$no_rawat'
-             UNION ALL SELECT SUM(hargasatuan * jumlah) FROM beri_obat_operasi WHERE no_rawat='$no_rawat'";
-$q_obat = safe_q($koneksi, $sql_obat);
-if ($q_obat) while ($ro = $q_obat->fetch_assoc()) $sum_obat += safeFloat_r($ro['tot']);
-$grand_total += $sum_obat;
-
-$q_ret = safe_q($koneksi, "SELECT SUM(r.jml * d.ralan) as tot FROM returpasien r JOIN databarang d ON r.kode_brng = d.kode_brng WHERE r.no_rawat='$no_rawat'");
-if ($q_ret && $rr = $q_ret->fetch_assoc()) $sum_retur += abs(safeFloat_r($rr['tot']));
-$grand_total -= $sum_retur;
-
-// F. PPN
-if ($tampilkan_ppn_ranap) {
-    $obat_bersih = $sum_obat - $sum_retur;
-    if ($obat_bersih > 0) $grand_total += round($obat_bersih * 0.11);
-}
-
-// G. Jasa Admin (Service) — pilih service berdasarkan penjamin
-$s = null;
-if ($kd_pj != '-' && $kd_pj != 'UMUM' && $kd_pj != 'A01') $s = $service_piutang;
-else $s = $service_umum;
-
-if ($s) {
-    $basis = 0;
-    if ($s['laborat']          == 'Yes') $basis += $sum_lab;
-    if ($s['radiologi']        == 'Yes') $basis += $sum_rad;
-    if ($s['operasi']          == 'Yes') $basis += $sum_op;
-    if ($s['obat']             == 'Yes') $basis += ($sum_obat - $sum_retur);
-    if ($s['ranap_dokter']     == 'Yes') $basis += $sum_dr_ranap;
-    if ($s['ranap_paramedis']  == 'Yes') $basis += $sum_pr_ranap;
-    if ($s['ralan_dokter']     == 'Yes') $basis += $sum_dr_ralan;
-    if ($s['ralan_paramedis']  == 'Yes') $basis += $sum_pr_ralan;
-    if ($s['tambahan']         == 'Yes') $basis += $sum_tambah;
-    if ($s['potongan']         == 'Yes') $basis += $sum_potong;
-    if ($s['kamar']            == 'Yes') $basis += $sum_kamar;
-    if ($s['registrasi']       == 'Yes') $basis += $sum_reg;
-    if ($s['harian']           == 'Yes') $basis += $sum_harian;
-
-    $persen = safeFloat_r($s['besar']);
-    if ($basis > 0 && $persen > 0) {
-        $jasa_admin = round($basis * ($persen / 100));
-        $cek = safe_q($koneksi, "SELECT totalbiaya FROM billing WHERE no_rawat='$no_rawat' AND (nm_perawatan LIKE '%Administrasi%' OR nm_perawatan LIKE '%Service%')");
-        if (!$cek || $cek->num_rows == 0) {
-            $grand_total += $jasa_admin;
-        } else {
-            while ($row_bill = $cek->fetch_assoc()) $grand_total += safeFloat_r($row_bill['totalbiaya']);
-        }
-    }
-}
-
-// DPJP
-$dpjp = '';
-$is_dpjp_fallback = false;
-$q_dpjp = safe_q($koneksi, "SELECT d.nm_dokter FROM dpjp_ranap dr JOIN dokter d ON dr.kd_dokter = d.kd_dokter WHERE dr.no_rawat='$no_rawat' LIMIT 1");
-if ($q_dpjp && $rd = $q_dpjp->fetch_assoc()) $dpjp = $rd['nm_dokter'];
-else $is_dpjp_fallback = true;
-
-// H. Ambil Plafon dari tabel perkiraan_biaya_ranap
-$plafon_val = 0;
-$has_plafon  = false;
-$q_plafon = safe_q($koneksi, "SELECT tarif FROM perkiraan_biaya_ranap WHERE no_rawat='$no_rawat' LIMIT 1");
-if ($q_plafon && $r_plafon = $q_plafon->fetch_assoc()) {
-    if (!is_null($r_plafon['tarif']) && $r_plafon['tarif'] !== '') {
-        $plafon_val = safeFloat_r($r_plafon['tarif']);
-        $has_plafon = ($plafon_val > 0);
-    }
-}
-
-$selisih_val = $grand_total - $plafon_val;
-$is_over     = ($has_plafon && $grand_total > $plafon_val);
-
-// Persentase penggunaan plafon (untuk progress bar)
-$pct = ($has_plafon && $plafon_val > 0) ? min(100, round(($grand_total / $plafon_val) * 100)) : 0;
-
-
-ob_end_clean();
-echo json_encode([
-    'no_rawat'         => $no_rawat,
-    'estimasi'         => number_format($grand_total, 0, ',', '.'),
-    'estimasi_raw'     => $grand_total,
-    'plafon'           => $has_plafon ? ('Rp ' . number_format($plafon_val, 0, ',', '.')) : '-',
-    'plafon_raw'       => $plafon_val,
-    'has_plafon'       => $has_plafon,
-    'selisih'          => $has_plafon ? ('Rp ' . number_format(abs($selisih_val), 0, ',', '.')) : '-',
-    'selisih_raw'      => $has_plafon ? $selisih_val : null,
-    'is_over'          => $is_over,
-    'pct'              => $pct,
-    'dpjp'             => $dpjp,
-    'is_dpjp_fallback' => $is_dpjp_fallback,
-]);
-
 ?>

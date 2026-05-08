@@ -6,7 +6,7 @@ header('Content-Type: application/json');
 // Ambil parameter filter
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
-$kd_pj = isset($_GET['kd_pj']) ? $koneksi->real_escape_string($_GET['kd_pj']) : '';
+$kd_pj = isset($_GET['kd_pj']) ? $_GET['kd_pj'] : '';
 
 $response = [
     'summary' => [
@@ -22,40 +22,47 @@ $response = [
     'data' => [] // Data tabel detail per kelurahan
 ];
 
-// Query Utama: Kunjungan Pasien dengan Agregasi Kelurahan, Kecamatan, dan Kabupaten
-// Kita menggunakan reg_periksa karena ini menunjukkan real kunjungan (bukan sekedar master pasien).
-// Asumsi status pasien Baru/Lama tercatat di reg_periksa.status_poli
-$sql = "SELECT 
-    kel.nm_kel, 
-    kec.nm_kec, 
-    kab.nm_kab,
-    COUNT(rp.no_rawat) as total_kunjungan,
-    SUM(CASE WHEN rp.status_poli = 'Baru' THEN 1 ELSE 0 END) as kunjungan_baru,
-    SUM(CASE WHEN rp.status_poli = 'Lama' THEN 1 ELSE 0 END) as kunjungan_lama
-FROM reg_periksa rp
-INNER JOIN pasien p ON rp.no_rkm_medis = p.no_rkm_medis
-INNER JOIN kelurahan kel ON p.kd_kel = kel.kd_kel
-INNER JOIN kecamatan kec ON p.kd_kec = kec.kd_kec
-INNER JOIN kabupaten kab ON p.kd_kab = kab.kd_kab
-WHERE rp.stts <> 'Batal' 
-  AND rp.tgl_registrasi BETWEEN '$tgl_awal' AND '$tgl_akhir'";
+try {
+    // Query Utama: Kunjungan Pasien dengan Agregasi Kelurahan, Kecamatan, dan Kabupaten
+    // Kita menggunakan reg_periksa karena ini menunjukkan real kunjungan (bukan sekedar master pasien).
+    // Asumsi status pasien Baru/Lama tercatat di reg_periksa.status_poli
+    $sql = "SELECT 
+        kel.nm_kel, 
+        kec.nm_kec, 
+        kab.nm_kab,
+        COUNT(rp.no_rawat) as total_kunjungan,
+        SUM(CASE WHEN rp.status_poli = 'Baru' THEN 1 ELSE 0 END) as kunjungan_baru,
+        SUM(CASE WHEN rp.status_poli = 'Lama' THEN 1 ELSE 0 END) as kunjungan_lama
+    FROM reg_periksa rp
+    INNER JOIN pasien p ON rp.no_rkm_medis = p.no_rkm_medis
+    INNER JOIN kelurahan kel ON p.kd_kel = kel.kd_kel
+    INNER JOIN kecamatan kec ON p.kd_kec = kec.kd_kec
+    INNER JOIN kabupaten kab ON p.kd_kab = kab.kd_kab
+    WHERE rp.stts <> 'Batal' 
+      AND rp.tgl_registrasi BETWEEN :tgl_awal AND :tgl_akhir";
 
-if (!empty($kd_pj)) {
-    $sql .= " AND rp.kd_pj = '$kd_pj'";
-}
+    $params = [
+        ':tgl_awal' => $tgl_awal,
+        ':tgl_akhir' => $tgl_akhir
+    ];
 
-// Group By Kelurahan (paling spesifik)
-$sql .= " GROUP BY kel.kd_kel, kel.nm_kel, kec.kd_kec, kec.nm_kec, kab.kd_kab, kab.nm_kab
-          ORDER BY total_kunjungan DESC";
+    if (!empty($kd_pj)) {
+        $sql .= " AND rp.kd_pj = :kd_pj";
+        $params[':kd_pj'] = $kd_pj;
+    }
 
-$result = $koneksi->query($sql);
+    // Group By Kelurahan (paling spesifik)
+    $sql .= " GROUP BY kel.kd_kel, kel.nm_kel, kec.kd_kec, kec.nm_kec, kab.kd_kab, kab.nm_kab
+              ORDER BY total_kunjungan DESC";
 
-if ($result) {
+    $stmt = $koneksi_pdo->prepare($sql);
+    $stmt->execute($params);
+
     // Array bantu untuk agregat level lebih tinggi (Chart)
     $agg_kab = [];
     $agg_kec = [];
 
-    while ($row = $result->fetch_assoc()) {
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $jml = (int)$row['total_kunjungan'];
         $baru = (int)$row['kunjungan_baru'];
         $lama = (int)$row['kunjungan_lama'];
@@ -117,6 +124,9 @@ if ($result) {
         $response['chart']['kelurahan']['labels'][] = $response['data'][$i]['nm_kel'] . ' - ' . $response['data'][$i]['nm_kec'];
         $response['chart']['kelurahan']['data'][] = $response['data'][$i]['total'];
     }
+
+} catch (PDOException $e) {
+    // return valid empty json
 }
 
 echo json_encode($response);

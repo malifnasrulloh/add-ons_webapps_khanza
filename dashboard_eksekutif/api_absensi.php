@@ -11,39 +11,33 @@ if (!isset($_SESSION['user_id'])) {
 
 $act = isset($_GET['act']) ? $_GET['act'] : '';
 
-// --- FUNGSI HELPER ---
-function validTeks($str, $koneksi) {
-    return $koneksi->real_escape_string(trim($str));
-}
-
 // 3. GET EVALUASI (Analyze)
 if ($act == 'analyze') {
-    $tgl1 = validTeks($_GET['tgl1'], $koneksi);
-    $tgl2 = validTeks($_GET['tgl2'], $koneksi);
-    $dep = validTeks($_GET['dep'], $koneksi);
-    $filter = validTeks($_GET['filter'], $koneksi); // 'ALL' atau 'MANGKIR'
+    $tgl1 = isset($_GET['tgl1']) ? trim($_GET['tgl1']) : '';
+    $tgl2 = isset($_GET['tgl2']) ? trim($_GET['tgl2']) : '';
+    $dep = isset($_GET['dep']) ? trim($_GET['dep']) : '';
+    $filter = isset($_GET['filter']) ? trim($_GET['filter']) : ''; // 'ALL' atau 'MANGKIR'
 
     $ref_jam = [];
-    $q_jam = $koneksi->query("SELECT dep_id, shift, jam_masuk, jam_pulang FROM jam_jaga");
-    if($q_jam){
-        while($j = $q_jam->fetch_assoc()) {
-            $ref_jam[$j['dep_id']][$j['shift']] = [
-                'in' => substr($j['jam_masuk'], 0, 5),
-                'out' => substr($j['jam_pulang'], 0, 5)
-            ];
-        }
+    $stmt_jam = $koneksi_pdo->query("SELECT dep_id, shift, jam_masuk, jam_pulang FROM jam_jaga");
+    while($j = $stmt_jam->fetch(PDO::FETCH_ASSOC)) {
+        $ref_jam[$j['dep_id']][$j['shift']] = [
+            'in' => substr($j['jam_masuk'], 0, 5),
+            'out' => substr($j['jam_pulang'], 0, 5)
+        ];
     }
 
-    $filter_dep = ($dep != 'ALL' && $dep != '') ? "AND departemen = '$dep'" : "";
-    $q_peg = "SELECT id, nik, nama, departemen FROM pegawai WHERE stts_aktif = 'AKTIF' $filter_dep ORDER BY nama ASC";
-    $res_peg = $koneksi->query($q_peg);
-    
-    $pegawai_list = [];
-    if($res_peg){
-        while($p = $res_peg->fetch_assoc()) {
-            $pegawai_list[] = $p;
-        }
+    $q_peg = "SELECT id, nik, nama, departemen FROM pegawai WHERE stts_aktif = 'AKTIF'";
+    $params_peg = [];
+    if ($dep != 'ALL' && $dep != '') {
+        $q_peg .= " AND departemen = :dep";
+        $params_peg[':dep'] = $dep;
     }
+    $q_peg .= " ORDER BY nama ASC";
+    
+    $stmt_peg = $koneksi_pdo->prepare($q_peg);
+    $stmt_peg->execute($params_peg);
+    $pegawai_list = $stmt_peg->fetchAll(PDO::FETCH_ASSOC);
 
     $data_evaluasi = [];
     $current_date = strtotime($tgl1);
@@ -60,26 +54,35 @@ if ($act == 'analyze') {
         $col_h = "h" . $hari_angka;
 
         $logs_rekap = [];
-        $q_log = $koneksi->query("SELECT id, jam_datang, jam_pulang, shift, status FROM rekap_presensi WHERE jam_datang LIKE '$date_sql%'");
-        if($q_log) { while($l = $q_log->fetch_assoc()) $logs_rekap[$l['id']] = $l; }
+        $stmt_log = $koneksi_pdo->prepare("SELECT id, jam_datang, jam_pulang, shift, status FROM rekap_presensi WHERE jam_datang LIKE :date_like");
+        $stmt_log->execute([':date_like' => $date_sql . '%']);
+        while($l = $stmt_log->fetch(PDO::FETCH_ASSOC)) {
+            $logs_rekap[$l['id']] = $l;
+        }
 
         $logs_temp = [];
-        $q_tmp = $koneksi->query("SELECT id, jam_datang, shift, status FROM temporary_presensi WHERE jam_datang LIKE '$date_sql%'");
-        if($q_tmp) { while($t = $q_tmp->fetch_assoc()) $logs_temp[$t['id']] = $t; }
+        $stmt_tmp = $koneksi_pdo->prepare("SELECT id, jam_datang, shift, status FROM temporary_presensi WHERE jam_datang LIKE :date_like");
+        $stmt_tmp->execute([':date_like' => $date_sql . '%']);
+        while($t = $stmt_tmp->fetch(PDO::FETCH_ASSOC)) {
+            $logs_temp[$t['id']] = $t;
+        }
 
         foreach ($pegawai_list as $peg) {
             $id_peg = $peg['id'];
             $dep_peg = $peg['departemen'];
             
             $jadwal_kode = '-';
-            $q_add = $koneksi->query("SELECT $col_h as shift FROM jadwal_tambahan WHERE id='$id_peg' AND tahun='$thn' AND (bulan='$bln' OR bulan='".(int)$bln."')");
-            if($q_add && $row_add = $q_add->fetch_assoc()){
+            // Menghindari SQL Injection dari table column. Note: $col_h is safe here as it's generated from date('j')
+            $q_add = $koneksi_pdo->prepare("SELECT $col_h as shift FROM jadwal_tambahan WHERE id = :id AND tahun = :tahun AND (bulan = :bulan_str OR bulan = :bulan_int)");
+            $q_add->execute([':id' => $id_peg, ':tahun' => $thn, ':bulan_str' => $bln, ':bulan_int' => (int)$bln]);
+            if($row_add = $q_add->fetch(PDO::FETCH_ASSOC)){
                 if(!empty($row_add['shift'])) $jadwal_kode = $row_add['shift'];
             }
             
             if($jadwal_kode == '-' || $jadwal_kode == '') {
-                $q_main = $koneksi->query("SELECT $col_h as shift FROM jadwal_pegawai WHERE id='$id_peg' AND tahun='$thn' AND (bulan='$bln' OR bulan='".(int)$bln."')");
-                if($q_main && $row_main = $q_main->fetch_assoc()){
+                $q_main = $koneksi_pdo->prepare("SELECT $col_h as shift FROM jadwal_pegawai WHERE id = :id AND tahun = :tahun AND (bulan = :bulan_str OR bulan = :bulan_int)");
+                $q_main->execute([':id' => $id_peg, ':tahun' => $thn, ':bulan_str' => $bln, ':bulan_int' => (int)$bln]);
+                if($row_main = $q_main->fetch(PDO::FETCH_ASSOC)){
                     $jadwal_kode = $row_main['shift'];
                 }
             }
@@ -156,54 +159,47 @@ if ($act == 'analyze') {
 
 // 2. GET DEPARTEMEN
 if ($act == 'get_dep') {
-    $sql = "SELECT dep_id, nama FROM departemen ORDER BY nama ASC";
-    $res = $koneksi->query($sql);
-    $data = [];
-    if($res){
-        while($row = $res->fetch_assoc()) {
-            $data[] = $row;
-        }
-    }
+    $stmt = $koneksi_pdo->query("SELECT dep_id, nama FROM departemen ORDER BY nama ASC");
+    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode($data);
     exit;
 }
 
 // 3. GET REKAP (Rekap Pelanggaran)
 if ($act == 'rekap') {
-    $tgl1 = validTeks($_GET['tgl1'], $koneksi);
-    $tgl2 = validTeks($_GET['tgl2'], $koneksi);
-    $dep = validTeks($_GET['dep'], $koneksi);
+    $tgl1 = isset($_GET['tgl1']) ? trim($_GET['tgl1']) : '';
+    $tgl2 = isset($_GET['tgl2']) ? trim($_GET['tgl2']) : '';
+    $dep = isset($_GET['dep']) ? trim($_GET['dep']) : '';
 
     $ref_jam = [];
-    $q_jam = $koneksi->query("SELECT dep_id, shift, jam_masuk, jam_pulang FROM jam_jaga");
-    if($q_jam) {
-        while ($j = $q_jam->fetch_assoc()) {
-            $ref_jam[$j['dep_id']][$j['shift']] = [
-                'in' => substr($j['jam_masuk'], 0, 5),
-                'out' => substr($j['jam_pulang'], 0, 5)
-            ];
-        }
+    $stmt_jam = $koneksi_pdo->query("SELECT dep_id, shift, jam_masuk, jam_pulang FROM jam_jaga");
+    while ($j = $stmt_jam->fetch(PDO::FETCH_ASSOC)) {
+        $ref_jam[$j['dep_id']][$j['shift']] = [
+            'in' => substr($j['jam_masuk'], 0, 5),
+            'out' => substr($j['jam_pulang'], 0, 5)
+        ];
     }
 
-    $filter_dep = ($dep != 'ALL' && $dep != '') ? "AND departemen = '$dep'" : "";
-    $q_peg = "SELECT id, nik, nama, departemen FROM pegawai WHERE stts_aktif = 'AKTIF' $filter_dep ORDER BY nama ASC";
-    $res_peg = $koneksi->query($q_peg);
-
-    $pegawai_list = [];
-    if($res_peg) {
-        while ($p = $res_peg->fetch_assoc()) {
-            $pegawai_list[] = $p;
-        }
+    $q_peg = "SELECT id, nik, nama, departemen FROM pegawai WHERE stts_aktif = 'AKTIF'";
+    $params_peg = [];
+    if ($dep != 'ALL' && $dep != '') {
+        $q_peg .= " AND departemen = :dep";
+        $params_peg[':dep'] = $dep;
     }
+    $q_peg .= " ORDER BY nama ASC";
+
+    $stmt_peg = $koneksi_pdo->prepare($q_peg);
+    $stmt_peg->execute($params_peg);
+    $pegawai_list = $stmt_peg->fetchAll(PDO::FETCH_ASSOC);
 
     // Pre-fetch Data Cuti
-    $q_cuti = "SELECT pc.nik, pc.tanggal_awal, pc.tanggal_akhir FROM pengajuan_cuti pc WHERE pc.status_persetujuan_HRD='Disetujui' AND pc.tanggal_awal <= '$tgl2' AND pc.tanggal_akhir >= '$tgl1'";
-    $r_cuti = $koneksi->query($q_cuti);
+    $q_cuti = "SELECT pc.nik, pc.tanggal_awal, pc.tanggal_akhir FROM pengajuan_cuti pc WHERE pc.status_persetujuan_HRD='Disetujui' AND pc.tanggal_awal <= :tgl2 AND pc.tanggal_akhir >= :tgl1";
+    $stmt_cuti = $koneksi_pdo->prepare($q_cuti);
+    $stmt_cuti->execute([':tgl2' => $tgl2, ':tgl1' => $tgl1]);
+    
     $arr_cuti = [];
-    if($r_cuti) {
-        while ($c = $r_cuti->fetch_assoc()) {
-            $arr_cuti[$c['nik']][] = ['awal' => strtotime($c['tanggal_awal']), 'akhir' => strtotime($c['tanggal_akhir'])];
-        }
+    while ($c = $stmt_cuti->fetch(PDO::FETCH_ASSOC)) {
+        $arr_cuti[$c['nik']][] = ['awal' => strtotime($c['tanggal_awal']), 'akhir' => strtotime($c['tanggal_akhir'])];
     }
 
     $final_data = [];
@@ -215,13 +211,13 @@ if ($act == 'rekap') {
         $dep_peg = $peg['departemen'];
 
         $logs_m = [];
-        $q_log = "SELECT jam_datang, jam_pulang, status, keterlambatan, durasi FROM rekap_presensi WHERE id='$id_peg' AND jam_datang >= '$tgl1 00:00:00' AND jam_datang <= '$tgl2 23:59:59'";
-        $r_log = $koneksi->query($q_log);
-        if($r_log) {
-            while ($l = $r_log->fetch_assoc()) {
-                $tgl_only = date('Y-m-d', strtotime($l['jam_datang']));
-                $logs_m[$tgl_only] = $l;
-            }
+        $q_log = "SELECT jam_datang, jam_pulang, status, keterlambatan, durasi FROM rekap_presensi WHERE id = :id AND jam_datang >= :awal AND jam_datang <= :akhir";
+        $stmt_log = $koneksi_pdo->prepare($q_log);
+        $stmt_log->execute([':id' => $id_peg, ':awal' => $tgl1 . ' 00:00:00', ':akhir' => $tgl2 . ' 23:59:59']);
+        
+        while ($l = $stmt_log->fetch(PDO::FETCH_ASSOC)) {
+            $tgl_only = date('Y-m-d', strtotime($l['jam_datang']));
+            $logs_m[$tgl_only] = $l;
         }
 
         $jml_t1 = 0; $rp_t1 = 0;
@@ -245,14 +241,16 @@ if ($act == 'rekap') {
             $col_h = "h" . $hari_angka;
 
             $jadwal_kode = '-';
-            $q_add = $koneksi->query("SELECT $col_h as shift FROM jadwal_tambahan WHERE id='$id_peg' AND tahun='$thn' AND (bulan='$bln' OR bulan='" . (int)$bln . "')");
-            if ($q_add && $row_add = $q_add->fetch_assoc()) {
+            $q_add = $koneksi_pdo->prepare("SELECT $col_h as shift FROM jadwal_tambahan WHERE id = :id AND tahun = :tahun AND (bulan = :bulan_str OR bulan = :bulan_int)");
+            $q_add->execute([':id' => $id_peg, ':tahun' => $thn, ':bulan_str' => $bln, ':bulan_int' => (int)$bln]);
+            if ($row_add = $q_add->fetch(PDO::FETCH_ASSOC)) {
                 if(!empty($row_add['shift'])) $jadwal_kode = $row_add['shift'];
             }
 
             if ($jadwal_kode == '-' || $jadwal_kode == '') {
-                $q_main = $koneksi->query("SELECT $col_h as shift FROM jadwal_pegawai WHERE id='$id_peg' AND tahun='$thn' AND (bulan='$bln' OR bulan='" . (int)$bln . "')");
-                if ($q_main && $row_main = $q_main->fetch_assoc()) {
+                $q_main = $koneksi_pdo->prepare("SELECT $col_h as shift FROM jadwal_pegawai WHERE id = :id AND tahun = :tahun AND (bulan = :bulan_str OR bulan = :bulan_int)");
+                $q_main->execute([':id' => $id_peg, ':tahun' => $thn, ':bulan_str' => $bln, ':bulan_int' => (int)$bln]);
+                if ($row_main = $q_main->fetch(PDO::FETCH_ASSOC)) {
                     $jadwal_kode = $row_main['shift'];
                 }
             }
@@ -319,8 +317,9 @@ if ($act == 'rekap') {
                     if ($is_today && $now_ts < $ts_masuk) {
                         $kat_harian = 'BELUM WAKTUNYA';
                     } else {
-                        $q_temp = $koneksi->query("SELECT id FROM temporary_presensi WHERE id='$id_peg' AND jam_datang LIKE '$date_str%'");
-                        if ($q_temp && $q_temp->num_rows == 0) {
+                        $q_temp = $koneksi_pdo->prepare("SELECT id FROM temporary_presensi WHERE id = :id AND jam_datang LIKE :date_like");
+                        $q_temp->execute([':id' => $id_peg, ':date_like' => $date_str . '%']);
+                        if (count($q_temp->fetchAll(PDO::FETCH_ASSOC)) == 0) {
                             $jml_mangkir++;
                             $kat_harian = 'MANGKIR';
                         } else {

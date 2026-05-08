@@ -256,6 +256,8 @@ function get_arrow_class($pages, $current) {
         /* 1. Bunuh bg-white dan bg-light bawaan Bootstrap dan custom classes */
         html.theme-glass-solid .bg-white, html.theme-glass-animated .bg-white,
         html.theme-glass-solid .bg-light, html.theme-glass-animated .bg-light,
+        html.theme-glass-solid .alert-light, html.theme-glass-animated .alert-light,
+        html.theme-glass-solid .alert-secondary, html.theme-glass-animated .alert-secondary,
         html.theme-glass-solid .table-light, html.theme-glass-animated .table-light,
         html.theme-glass-solid .table-white, html.theme-glass-animated .table-white {
             background-color: rgba(255,255,255,0.05) !important;

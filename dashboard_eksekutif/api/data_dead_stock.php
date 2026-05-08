@@ -7,16 +7,16 @@ header('Content-Type: application/json');
 $rentang = isset($_GET['rentang']) ? $_GET['rentang'] : '3bulan';
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : '';
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : '';
-$kd_bangsal = isset($_GET['kd_bangsal']) ? $koneksi->real_escape_string($_GET['kd_bangsal']) : '';
-$keyword = isset($_GET['keyword']) ? $koneksi->real_escape_string($_GET['keyword']) : '';
+$kd_bangsal = isset($_GET['kd_bangsal']) ? $_GET['kd_bangsal'] : '';
+$keyword = isset($_GET['keyword']) ? $_GET['keyword'] : '';
 
 // Tentukan tanggal batas (cutoff)
 $cutoff_start = "";
 $cutoff_end = date('Y-m-d'); // Default end date is today
 
 if ($rentang === 'custom') {
-    $cutoff_start = $koneksi->real_escape_string($tgl_awal);
-    $cutoff_end = $koneksi->real_escape_string($tgl_akhir);
+    $cutoff_start = $tgl_awal;
+    $cutoff_end = $tgl_akhir;
 } else {
     // Generate cutoff start based on predefined range
     switch ($rentang) {
@@ -59,50 +59,58 @@ if (empty($cutoff_start) || empty($cutoff_end)) {
     exit;
 }
 
-/* 
- * Query Logika Dead Stock:
- * Cari dari gudangbarang (stok > 0), join databarang (untuk nama & hpp).
- * HPP yang digunakan adalah dasarnya tabel databarang `dasar` atau `h_beli`.
- * Filter NOT EXISTS di transaksi riwayat_barang_medis posisi = 'Keluar' pada rentang waktu.
- */
+try {
+    /* 
+     * Query Logika Dead Stock:
+     * Cari dari gudangbarang (stok > 0), join databarang (untuk nama & hpp).
+     * HPP yang digunakan adalah dasarnya tabel databarang `dasar` atau `h_beli`.
+     * Filter NOT EXISTS di transaksi riwayat_barang_medis posisi = 'Keluar' pada rentang waktu.
+     */
 
-$sql = "SELECT 
-    g.kode_brng,
-    d.nama_brng,
-    g.kd_bangsal,
-    b.nm_bangsal,
-    g.stok,
-    d.dasar as hpp_dasar
-FROM gudangbarang g
-INNER JOIN databarang d ON g.kode_brng = d.kode_brng
-INNER JOIN bangsal b ON g.kd_bangsal = b.kd_bangsal
-WHERE g.stok > 0 
-  AND NOT EXISTS (
-      SELECT 1 
-      FROM riwayat_barang_medis r 
-      WHERE r.kode_brng = g.kode_brng 
-        AND r.kd_bangsal = g.kd_bangsal 
-        AND r.posisi = 'Keluar' 
-        AND r.tanggal BETWEEN '$cutoff_start' AND '$cutoff_end'
-  )";
+    $sql = "SELECT 
+        g.kode_brng,
+        d.nama_brng,
+        g.kd_bangsal,
+        b.nm_bangsal,
+        g.stok,
+        d.dasar as hpp_dasar
+    FROM gudangbarang g
+    INNER JOIN databarang d ON g.kode_brng = d.kode_brng
+    INNER JOIN bangsal b ON g.kd_bangsal = b.kd_bangsal
+    WHERE g.stok > 0 
+      AND NOT EXISTS (
+          SELECT 1 
+          FROM riwayat_barang_medis r 
+          WHERE r.kode_brng = g.kode_brng 
+            AND r.kd_bangsal = g.kd_bangsal 
+            AND r.posisi = 'Keluar' 
+            AND r.tanggal BETWEEN :cutoff_start AND :cutoff_end
+      )";
 
-if (!empty($kd_bangsal)) {
-    $sql .= " AND g.kd_bangsal = '$kd_bangsal'";
-}
+    $params = [
+        ':cutoff_start' => $cutoff_start,
+        ':cutoff_end' => $cutoff_end
+    ];
 
-if (!empty($keyword)) {
-    $sql .= " AND (g.kode_brng LIKE '%$keyword%' OR d.nama_brng LIKE '%$keyword%')";
-}
+    if (!empty($kd_bangsal)) {
+        $sql .= " AND g.kd_bangsal = :kd_bangsal";
+        $params[':kd_bangsal'] = $kd_bangsal;
+    }
 
-// Biar performanya baik, limitasi tidak dipakai jika ingin total agregat akurat.
-$result = $koneksi->query($sql);
+    if (!empty($keyword)) {
+        $sql .= " AND (g.kode_brng LIKE :keyword1 OR d.nama_brng LIKE :keyword2)";
+        $params[':keyword1'] = '%' . $keyword . '%';
+        $params[':keyword2'] = '%' . $keyword . '%';
+    }
 
-if ($result) {
+    $stmt = $koneksi_pdo->prepare($sql);
+    $stmt->execute($params);
+
     $total_item = 0;
     $total_aset = 0;
     $total_stok = 0;
 
-    while ($row = $result->fetch_assoc()) {
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $stok = floatval($row['stok']);
         $hpp = floatval($row['hpp_dasar']);
         $subtotal_aset = $stok * $hpp;
@@ -135,6 +143,9 @@ if ($result) {
     $response['summary']['total_item'] = $total_item;
     $response['summary']['total_stok'] = $total_stok;
     $response['summary']['total_aset'] = $total_aset;
+
+} catch (PDOException $e) {
+    // Return empty json with safe default summary
 }
 
 echo json_encode($response);

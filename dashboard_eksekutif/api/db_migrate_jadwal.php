@@ -24,7 +24,6 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'Super Admin')
 }
 
 $act = $_GET['act'] ?? 'status';
-$db  = $koneksi; // MySQLi connection
 
 // ─── Definisi ENUM Target ─────────────────────────────────────────────────────
 // Nilai ENUM lengkap yang HARUS ada di kolom h1-h31 jadwal_pegawai/tambahan
@@ -53,33 +52,33 @@ $enum_shift_target = "'Pagi','Pagi2','Pagi3','Pagi4','Pagi5','Pagi6','Pagi7','Pa
                    . "'Libur','Cuti'";
 
 // ─── Helper: Cek apakah suatu kolom ENUM sudah mengandung 'Libur' dan 'Cuti' ─
-function isEnumMigrated($db, $tabel, $kolom) {
-    $dbname = $db->select_db($GLOBALS['dbname'] ?? '') ? $GLOBALS['dbname'] : '';
-    // Ambil nama DB aktif
-    $r = $db->query("SELECT DATABASE() AS db");
-    $dbname = $r ? $r->fetch_assoc()['db'] : '';
+function isEnumMigrated($db_pdo, $tabel, $kolom) {
+    try {
+        // Ambil nama DB aktif
+        $r = $db_pdo->query("SELECT DATABASE() AS db");
+        $dbname = $r ? $r->fetch(PDO::FETCH_ASSOC)['db'] : '';
 
-    $stmt = $db->prepare(
-        "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1"
-    );
-    if (!$stmt) return ['status' => 'error', 'info' => $db->error];
-    $stmt->bind_param('sss', $dbname, $tabel, $kolom);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+        $stmt = $db_pdo->prepare(
+            "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = :dbname AND TABLE_NAME = :tabel AND COLUMN_NAME = :kolom LIMIT 1"
+        );
+        $stmt->execute([':dbname' => $dbname, ':tabel' => $tabel, ':kolom' => $kolom]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$row) return ['exists' => false, 'migrated' => false, 'type' => null];
+        if (!$row) return ['exists' => false, 'migrated' => false, 'type' => null];
 
-    $hasLibur = (strpos($row['COLUMN_TYPE'], "'Libur'") !== false);
-    $hasCuti  = (strpos($row['COLUMN_TYPE'], "'Cuti'")  !== false);
-    return [
-        'exists'   => true,
-        'migrated' => ($hasLibur && $hasCuti),
-        'hasLibur' => $hasLibur,
-        'hasCuti'  => $hasCuti,
-        'type'     => $row['COLUMN_TYPE']
-    ];
+        $hasLibur = (strpos($row['COLUMN_TYPE'], "'Libur'") !== false);
+        $hasCuti  = (strpos($row['COLUMN_TYPE'], "'Cuti'")  !== false);
+        return [
+            'exists'   => true,
+            'migrated' => ($hasLibur && $hasCuti),
+            'hasLibur' => $hasLibur,
+            'hasCuti'  => $hasCuti,
+            'type'     => $row['COLUMN_TYPE']
+        ];
+    } catch (PDOException $e) {
+        return ['status' => 'error', 'info' => $e->getMessage()];
+    }
 }
 
 // ─── act=status : Cek status seluruh tabel ────────────────────────────────────
@@ -88,11 +87,11 @@ if ($act === 'status') {
 
     // jadwal_pegawai & jadwal_tambahan: cek h1 sebagai representatif
     foreach (['jadwal_pegawai', 'jadwal_tambahan'] as $tbl) {
-        $info = isEnumMigrated($db, $tbl, 'h1');
+        $info = isEnumMigrated($koneksi_pdo, $tbl, 'h1');
         // Hitung berapa kolom (h1-h31) yang sudah dimigrasikan
         $migrated_count = 0;
         for ($i = 1; $i <= 31; $i++) {
-            $ci = isEnumMigrated($db, $tbl, "h$i");
+            $ci = isEnumMigrated($koneksi_pdo, $tbl, "h$i");
             if (!empty($ci['migrated'])) $migrated_count++;
         }
         $result[$tbl] = [
@@ -106,7 +105,7 @@ if ($act === 'status') {
 
     // rekap_presensi & temporary_presensi: cek kolom shift
     foreach (['rekap_presensi', 'temporary_presensi'] as $tbl) {
-        $info = isEnumMigrated($db, $tbl, 'shift');
+        $info = isEnumMigrated($koneksi_pdo, $tbl, 'shift');
         $result[$tbl] = [
             'label'           => $tbl,
             'columns_total'   => 1,
@@ -124,53 +123,59 @@ if ($act === 'status') {
 if ($act === 'migrate') {
     $logs    = [];
     $errors  = [];
-    $db->autocommit(false);
+    
+    try {
+        $koneksi_pdo->beginTransaction();
 
-    // ── 1. Bangun ALTER TABLE jadwal_pegawai (h1-h31) ─────────────────────────
-    foreach (['jadwal_pegawai', 'jadwal_tambahan'] as $tbl) {
-        $modify_parts = [];
-        for ($i = 1; $i <= 31; $i++) {
-            $ci = isEnumMigrated($db, $tbl, "h$i");
+        // ── 1. Bangun ALTER TABLE jadwal_pegawai (h1-h31) ─────────────────────────
+        foreach (['jadwal_pegawai', 'jadwal_tambahan'] as $tbl) {
+            $modify_parts = [];
+            for ($i = 1; $i <= 31; $i++) {
+                $ci = isEnumMigrated($koneksi_pdo, $tbl, "h$i");
+                if (isset($ci['migrated']) && !$ci['migrated']) {
+                    $modify_parts[] = "MODIFY COLUMN `h$i` enum($enum_target) CHARACTER SET latin1 COLLATE latin1_swedish_ci DEFAULT ''";
+                }
+            }
+            if (!empty($modify_parts)) {
+                $sql = "ALTER TABLE `$tbl` " . implode(', ', $modify_parts);
+                if ($koneksi_pdo->query($sql)) {
+                    $logs[] = "✅ ALTER TABLE $tbl : " . count($modify_parts) . " kolom h-col berhasil diperbarui.";
+                } else {
+                    $errors[] = "❌ ALTER TABLE $tbl GAGAL (query execution failed).";
+                }
+            } else {
+                $logs[] = "ℹ️  $tbl : semua kolom sudah up-to-date, dilewati.";
+            }
+        }
+
+        // ── 2. Bangun ALTER TABLE rekap_presensi.shift ────────────────────────────
+        foreach (['rekap_presensi', 'temporary_presensi'] as $tbl) {
+            $ci = isEnumMigrated($koneksi_pdo, $tbl, 'shift');
             if (isset($ci['migrated']) && !$ci['migrated']) {
-                $modify_parts[] = "MODIFY COLUMN `h$i` enum($GLOBALS[enum_target]) CHARACTER SET latin1 COLLATE latin1_swedish_ci DEFAULT ''";
-            }
-        }
-        if (!empty($modify_parts)) {
-            $sql = "ALTER TABLE `$tbl` " . implode(', ', $modify_parts);
-            if ($db->query($sql)) {
-                $logs[] = "✅ ALTER TABLE $tbl : " . count($modify_parts) . " kolom h-col berhasil diperbarui.";
+                // Shift pada tabel presensi: tetap NOT NULL (tidak ada default)
+                $sql = "ALTER TABLE `$tbl` MODIFY COLUMN `shift` enum($enum_shift_target) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL";
+                if ($koneksi_pdo->query($sql)) {
+                    $logs[] = "✅ ALTER TABLE $tbl.shift berhasil diperbarui.";
+                } else {
+                    $errors[] = "❌ ALTER TABLE $tbl.shift GAGAL (query execution failed).";
+                }
             } else {
-                $errors[] = "❌ ALTER TABLE $tbl GAGAL: " . $db->error;
+                $logs[] = "ℹ️  $tbl.shift : sudah up-to-date, dilewati.";
             }
-        } else {
-            $logs[] = "ℹ️  $tbl : semua kolom sudah up-to-date, dilewati.";
         }
-    }
 
-    // ── 2. Bangun ALTER TABLE rekap_presensi.shift ────────────────────────────
-    foreach (['rekap_presensi', 'temporary_presensi'] as $tbl) {
-        $ci = isEnumMigrated($db, $tbl, 'shift');
-        if (isset($ci['migrated']) && !$ci['migrated']) {
-            // Shift pada tabel presensi: tetap NOT NULL (tidak ada default)
-            $sql = "ALTER TABLE `$tbl` MODIFY COLUMN `shift` enum($GLOBALS[enum_shift_target]) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL";
-            if ($db->query($sql)) {
-                $logs[] = "✅ ALTER TABLE $tbl.shift berhasil diperbarui.";
-            } else {
-                $errors[] = "❌ ALTER TABLE $tbl.shift GAGAL: " . $db->error;
-            }
+        if (empty($errors)) {
+            $koneksi_pdo->commit();
+            echo json_encode(['success' => true,  'logs' => $logs, 'errors' => []]);
         } else {
-            $logs[] = "ℹ️  $tbl.shift : sudah up-to-date, dilewati.";
+            $koneksi_pdo->rollBack();
+            echo json_encode(['success' => false, 'logs' => $logs, 'errors' => $errors]);
         }
-    }
-
-    if (empty($errors)) {
-        $db->commit();
-        echo json_encode(['success' => true,  'logs' => $logs, 'errors' => []]);
-    } else {
-        $db->rollback();
+    } catch (PDOException $e) {
+        $koneksi_pdo->rollBack();
+        $errors[] = "Exception: " . $e->getMessage();
         echo json_encode(['success' => false, 'logs' => $logs, 'errors' => $errors]);
     }
-    $db->autocommit(true);
     exit;
 }
 

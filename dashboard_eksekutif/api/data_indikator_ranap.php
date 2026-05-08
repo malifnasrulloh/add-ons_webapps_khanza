@@ -40,81 +40,102 @@ $pasien_keluar = 0;     // D (Discharges - Hidup+Mati)
 $pasien_mati = 0;       // Total Mati (untuk GDR)
 $pasien_mati_48 = 0;    // Mati > 48 Jam (untuk NDR)
 
-// ---------------------------------------------------------
-// LANGKAH A: Hitung Jumlah Tempat Tidur (TT)
-// ---------------------------------------------------------
-// Kita hitung kamar yang statusdata='1' (Aktif)
-$sql_bed = "SELECT COUNT(kd_kamar) as total FROM kamar WHERE statusdata='1'";
-if (!empty($kd_bangsal)) {
-    $sql_bed .= " AND kd_bangsal = '$kd_bangsal'";
-}
-$res_bed = $koneksi->query($sql_bed);
-if ($res_bed) {
-    $row = $res_bed->fetch_assoc();
-    $total_bed = (int)$row['total'];
-}
+try {
+    // ---------------------------------------------------------
+    // LANGKAH A: Hitung Jumlah Tempat Tidur (TT)
+    // ---------------------------------------------------------
+    // Kita hitung kamar yang statusdata='1' (Aktif)
+    $sql_bed = "SELECT COUNT(kd_kamar) as total FROM kamar WHERE statusdata='1'";
+    $params_bed = [];
+    if (!empty($kd_bangsal)) {
+        $sql_bed .= " AND kd_bangsal = :kd_bangsal";
+        $params_bed[':kd_bangsal'] = $kd_bangsal;
+    }
+    $stmt_bed = $koneksi_pdo->prepare($sql_bed);
+    $stmt_bed->execute($params_bed);
+    $row_bed = $stmt_bed->fetch(PDO::FETCH_ASSOC);
+    if ($row_bed) {
+        $total_bed = (int)$row_bed['total'];
+    }
 
-// Jika bed 0 (misal data kosong), set 1 untuk menghindari division by zero error
-if ($total_bed == 0) $total_bed = 1; 
-
-
-// ---------------------------------------------------------
-// LANGKAH B: Hitung Hari Perawatan (HP) - NUMERATOR BOR
-// ---------------------------------------------------------
-// Logic: Sum lama rawat semua pasien yang keluar di periode ini.
-// Termasuk 'Pindah Kamar' karena bed-nya terpakai.
-// Rumus hari: Jika masuk & keluar hari sama, hitung 1. Jika beda, hitung selisihnya.
-
-$sql_hp = "
-    SELECT 
-        SUM(
-            IF(
-                DATEDIFF(tgl_keluar, tgl_masuk) = 0, 
-                1, 
-                DATEDIFF(tgl_keluar, tgl_masuk)
-            )
-        ) as total_hp
-    FROM kamar_inap 
-    WHERE tgl_keluar BETWEEN '$tgl_awal' AND '$tgl_akhir'
-";
-
-if (!empty($kd_bangsal)) {
-    $sql_hp .= " AND kd_bangsal = '$kd_bangsal'";
-}
-
-$res_hp = $koneksi->query($sql_hp);
-if ($res_hp) {
-    $row = $res_hp->fetch_assoc();
-    $hari_perawatan = (int)$row['total_hp'];
-}
+    // Jika bed 0 (misal data kosong), set 1 untuk menghindari division by zero error
+    if ($total_bed == 0) $total_bed = 1; 
 
 
-// ---------------------------------------------------------
-// LANGKAH C: Hitung Pasien Keluar (D) & Kematian
-// ---------------------------------------------------------
-// Logic: Pasien keluar Hidup + Mati.
-// PENTING: Exclude 'Pindah Kamar' agar tidak double count untuk ALOS/BTO.
+    // ---------------------------------------------------------
+    // LANGKAH B: Hitung Hari Perawatan (HP) - NUMERATOR BOR
+    // ---------------------------------------------------------
+    // Logic: Sum lama rawat semua pasien yang keluar di periode ini.
+    // Termasuk 'Pindah Kamar' karena bed-nya terpakai.
+    // Rumus hari: Jika masuk & keluar hari sama, hitung 1. Jika beda, hitung selisihnya.
 
-$sql_pasien = "
-    SELECT 
-        COUNT(no_rawat) as total_keluar,
-        SUM(IF(stts_pulang = 'Meninggal', 1, 0)) as total_mati,
-        SUM(IF(stts_pulang = 'Meninggal' AND DATEDIFF(tgl_keluar, tgl_masuk) >= 2, 1, 0)) as mati_lebih_48
-    FROM kamar_inap 
-    WHERE tgl_keluar BETWEEN '$tgl_awal' AND '$tgl_akhir'
-    AND stts_pulang != 'Pindah Kamar'
-";
+    $sql_hp = "
+        SELECT 
+            SUM(
+                IF(
+                    DATEDIFF(tgl_keluar, tgl_masuk) = 0, 
+                    1, 
+                    DATEDIFF(tgl_keluar, tgl_masuk)
+                )
+            ) as total_hp
+        FROM kamar_inap 
+        WHERE tgl_keluar BETWEEN :tgl_awal AND :tgl_akhir
+    ";
 
-if (!empty($kd_bangsal)) {
-    $sql_pasien .= " AND kd_bangsal = '$kd_bangsal'";
-}
+    $params_hp = [
+        ':tgl_awal' => $tgl_awal,
+        ':tgl_akhir' => $tgl_akhir
+    ];
 
-$res_pasien = $koneksi->query($sql_pasien);
-if ($res_pasien) {
-    $row = $res_pasien->fetch_assoc();
-    $pasien_keluar = (int)$row['total_keluar'];
-    $pasien_mati = (int)$row['total_mati'];
-    $pasien_mati_48 = (int)$row['mati_lebih_48'];
+    if (!empty($kd_bangsal)) {
+        $sql_hp .= " AND kd_bangsal = :kd_bangsal";
+        $params_hp[':kd_bangsal'] = $kd_bangsal;
+    }
+
+    $stmt_hp = $koneksi_pdo->prepare($sql_hp);
+    $stmt_hp->execute($params_hp);
+    $row_hp = $stmt_hp->fetch(PDO::FETCH_ASSOC);
+    if ($row_hp) {
+        $hari_perawatan = (int)$row_hp['total_hp'];
+    }
+
+
+    // ---------------------------------------------------------
+    // LANGKAH C: Hitung Pasien Keluar (D) & Kematian
+    // ---------------------------------------------------------
+    // Logic: Pasien keluar Hidup + Mati.
+    // PENTING: Exclude 'Pindah Kamar' agar tidak double count untuk ALOS/BTO.
+
+    $sql_pasien = "
+        SELECT 
+            COUNT(no_rawat) as total_keluar,
+            SUM(IF(stts_pulang = 'Meninggal', 1, 0)) as total_mati,
+            SUM(IF(stts_pulang = 'Meninggal' AND DATEDIFF(tgl_keluar, tgl_masuk) >= 2, 1, 0)) as mati_lebih_48
+        FROM kamar_inap 
+        WHERE tgl_keluar BETWEEN :tgl_awal AND :tgl_akhir
+        AND stts_pulang != 'Pindah Kamar'
+    ";
+
+    $params_pasien = [
+        ':tgl_awal' => $tgl_awal,
+        ':tgl_akhir' => $tgl_akhir
+    ];
+
+    if (!empty($kd_bangsal)) {
+        $sql_pasien .= " AND kd_bangsal = :kd_bangsal";
+        $params_pasien[':kd_bangsal'] = $kd_bangsal;
+    }
+
+    $stmt_pasien = $koneksi_pdo->prepare($sql_pasien);
+    $stmt_pasien->execute($params_pasien);
+    $row_pasien = $stmt_pasien->fetch(PDO::FETCH_ASSOC);
+    if ($row_pasien) {
+        $pasien_keluar = (int)$row_pasien['total_keluar'];
+        $pasien_mati = (int)$row_pasien['total_mati'];
+        $pasien_mati_48 = (int)$row_pasien['mati_lebih_48'];
+    }
+} catch (PDOException $e) {
+    // fallback logic applies
 }
 
 // Hindari division by zero untuk pasien keluar

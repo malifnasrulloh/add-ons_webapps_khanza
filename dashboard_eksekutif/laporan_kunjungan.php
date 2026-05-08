@@ -1,7 +1,7 @@
 <?php
 /*
- * File laporan_kunjungan.php (BERSIH)
- * Laporan jumlah kunjungan pasien (Non-Batal).
+ * File laporan_kunjungan.php (SECURITY HARDENED - PDO)
+ * Laporan jumlah kunjungan pasien (Non-Batal) dengan filter Penjamin & Poliklinik.
  */
 
 // 1. Setup
@@ -15,20 +15,26 @@ $jam_awal = isset($_GET['jam_awal']) ? htmlspecialchars($_GET['jam_awal']) : '00
 $tgl_akhir = isset($_GET['tgl_akhir']) ? htmlspecialchars($_GET['tgl_akhir']) : date('Y-m-d');
 $jam_akhir = isset($_GET['jam_akhir']) ? htmlspecialchars($_GET['jam_akhir']) : '23:59:59';
 $kd_pj = isset($_GET['kd_pj']) ? htmlspecialchars($_GET['kd_pj']) : ''; 
+$kd_poli = isset($_GET['kd_poli']) ? htmlspecialchars($_GET['kd_poli']) : ''; 
 $action = isset($_GET['action']) ? $_GET['action'] : ''; 
 
 $datetime_awal = $tgl_awal . ' ' . $jam_awal;
 $datetime_akhir = $tgl_akhir . ' ' . $jam_akhir;
 
-// 3. Data Penjamin (Dropdown)
+// 3. Data Pendukung (Dropdown) - Menggunakan PDO
+// --- Penjamin ---
 $penjabs = [];
-$sql_penjab = "SELECT kd_pj, png_jawab FROM penjab ORDER BY png_jawab ASC";
-$result_penjab = $koneksi->query($sql_penjab);
-if ($result_penjab) {
-    while ($row = $result_penjab->fetch_assoc()) {
-        $penjabs[] = $row;
-    }
-}
+$sql_penjab = "SELECT kd_pj, png_jawab FROM penjab WHERE status = '1' ORDER BY png_jawab ASC";
+$stmt_pj = $koneksi_pdo->prepare($sql_penjab);
+$stmt_pj->execute();
+$penjabs = $stmt_pj->fetchAll();
+
+// --- Poliklinik ---
+$polis = [];
+$sql_poli = "SELECT kd_poli, nm_poli FROM poliklinik WHERE status = '1' ORDER BY nm_poli ASC";
+$stmt_poli = $koneksi_pdo->prepare($sql_poli);
+$stmt_poli->execute();
+$polis = $stmt_poli->fetchAll();
 
 // 4. Logika Pengambilan Data Tabel (Hanya jika ada action cari)
 $data_ralan = [];
@@ -37,14 +43,20 @@ $is_search = ($action == 'cari');
 
 if ($is_search) {
     // Base WHERE: Rentang tanggal & Tidak Batal
-    $where_base = " WHERE CONCAT(reg_periksa.tgl_registrasi, ' ', reg_periksa.jam_reg) BETWEEN ? AND ? AND reg_periksa.stts != 'Batal' ";
-    $params = [$datetime_awal, $datetime_akhir];
-    $types = "ss";
+    $where_base = " WHERE CONCAT(reg_periksa.tgl_registrasi, ' ', reg_periksa.jam_reg) BETWEEN :awal AND :akhir AND reg_periksa.stts != 'Batal' ";
+    $params = [
+        ':awal' => $datetime_awal,
+        ':akhir' => $datetime_akhir
+    ];
 
     if (!empty($kd_pj)) {
-        $where_base .= " AND reg_periksa.kd_pj = ? ";
-        $params[] = $kd_pj;
-        $types .= "s";
+        $where_base .= " AND reg_periksa.kd_pj = :kd_pj ";
+        $params[':kd_pj'] = $kd_pj;
+    }
+
+    if (!empty($kd_poli)) {
+        $where_base .= " AND reg_periksa.kd_poli = :kd_poli ";
+        $params[':kd_poli'] = $kd_poli;
     }
 
     // --- Query Ralan ---
@@ -62,27 +74,16 @@ if ($is_search) {
         ORDER BY reg_periksa.tgl_registrasi DESC, reg_periksa.jam_reg DESC
     ";
 
-    $stmt = $koneksi->prepare($sql_ralan);
-    if ($stmt) {
-        $bind_names = [];
-        $bind_names[] = $types;
-        for ($i=0; $i<count($params);$i++) { $bind_names[] = &$params[$i]; }
-        call_user_func_array(array($stmt, 'bind_param'), $bind_names);
-        
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $data_ralan[] = $row;
-        }
-        $stmt->close();
-    }
+    $stmt_ralan = $koneksi_pdo->prepare($sql_ralan);
+    $stmt_ralan->execute($params);
+    $data_ralan = $stmt_ralan->fetchAll();
 
     // --- Query Ranap ---
     $sql_ranap = "
         SELECT 
             reg_periksa.no_rawat, reg_periksa.tgl_registrasi, reg_periksa.jam_reg, 
             reg_periksa.no_rkm_medis, pasien.nm_pasien, 
-            dokter.nm_dokter, poliklinik.nm_poli, penjab.png_jawab, reg_periksa.stts_daftar
+            dokter.nm_dokter, poliklinik.nm_poli, penjab.png_jawab, reg_periksa.stts_daftar, reg_periksa.stts
         FROM reg_periksa
         INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
         INNER JOIN dokter ON reg_periksa.kd_dokter = dokter.kd_dokter
@@ -92,20 +93,9 @@ if ($is_search) {
         ORDER BY reg_periksa.tgl_registrasi DESC, reg_periksa.jam_reg DESC
     ";
 
-    $stmt = $koneksi->prepare($sql_ranap);
-    if ($stmt) {
-        $bind_names = [];
-        $bind_names[] = $types;
-        for ($i=0; $i<count($params);$i++) { $bind_names[] = &$params[$i]; }
-        call_user_func_array(array($stmt, 'bind_param'), $bind_names);
-        
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $data_ranap[] = $row;
-        }
-        $stmt->close();
-    }
+    $stmt_ranap = $koneksi_pdo->prepare($sql_ranap);
+    $stmt_ranap->execute($params);
+    $data_ranap = $stmt_ranap->fetchAll();
 }
 ?>
 
@@ -133,6 +123,17 @@ if ($is_search) {
                         <input type="time" class="form-control" name="jam_akhir" value="<?php echo $jam_akhir; ?>">
                     </div>
                     <div class="col-md-2">
+                        <label class="form-label">Poliklinik</label>
+                        <select name="kd_poli" class="form-select">
+                            <option value="">-- Semua Poliklinik --</option>
+                            <?php foreach($polis as $pl): ?>
+                                <option value="<?php echo $pl['kd_poli']; ?>" <?php echo ($kd_poli == $pl['kd_poli']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($pl['nm_poli']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
                         <label class="form-label">Penjamin</label>
                         <select name="kd_pj" class="form-select">
                             <option value="">-- Semua Penjamin --</option>
@@ -143,8 +144,8 @@ if ($is_search) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100">
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-primary px-4">
                             <i class="fas fa-search me-2"></i> Tampilkan
                         </button>
                     </div>
@@ -245,6 +246,11 @@ if ($is_search) {
                 </div>
 
                 <div class="tab-pane fade" id="ranap" role="tabpanel" aria-labelledby="ranap-tab">
+                    <?php if (!empty($kd_poli)): ?>
+                    <div class="alert alert-warning py-2 small mb-3">
+                        <i class="fas fa-info-circle me-1"></i> Data ini terfilter berdasarkan <strong>Asal Poli/IGD</strong> yang diregistrasikan di awal kunjungan oleh admisi.
+                    </div>
+                    <?php endif; ?>
                     <div class="table-responsive">
                         <table class="table table-striped table-bordered table-sm dt-table" width="100%">
                             <thead>
@@ -284,8 +290,11 @@ if ($is_search) {
     </div>
 
     <?php else: ?>
-        <div class="alert alert-secondary text-center p-5">
-            <h4>Silakan pilih filter tanggal dan klik "Tampilkan"</h4>
+        <div class="card shadow-sm mb-4">
+            <div class="card-body text-center p-5">
+                <h4 class="text-primary">Silakan pilih filter tanggal dan klik "Tampilkan"</h4>
+                <p class="text-muted mb-0">Data tidak dimuat otomatis untuk menjaga performa aplikasi.</p>
+            </div>
         </div>
     <?php endif; ?>
 </div>
@@ -349,6 +358,7 @@ if ($is_search) {
             jam_awal: $('input[name="jam_awal"]').val(),
             tgl_akhir: $('input[name="tgl_akhir"]').val(),
             jam_akhir: $('input[name="jam_akhir"]').val(),
+            kd_poli: $('select[name="kd_poli"]').val(),
             kd_pj: $('select[name="kd_pj"]').val()
         };
 

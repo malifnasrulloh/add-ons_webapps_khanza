@@ -17,43 +17,43 @@ $response = [
     'data' => []
 ];
 
-// Query Data Mentah Faktur Belum Lunas
-$sql = "SELECT 
-    p.no_faktur,
-    p.no_order,
-    s.nama_suplier, 
-    pt.nama AS nama_petugas,
-    p.tgl_tempo,
-    p.tgl_pesan,
-    p.tgl_faktur,
-    b.nm_bangsal,
-    p.tagihan,
-    COALESCE(
-        (SELECT SUM(besar_bayar) 
-         FROM bayar_pemesanan 
-         WHERE bayar_pemesanan.no_faktur = p.no_faktur
-        ), 0
-    ) AS cicilan_dibayar,
-    s.nama_bank,
-    s.rekening 
-FROM pemesanan p
-INNER JOIN datasuplier s ON p.kode_suplier = s.kode_suplier 
-INNER JOIN bangsal b ON p.kd_bangsal = b.kd_bangsal 
-INNER JOIN petugas pt ON p.nip = pt.nip 
-WHERE 
-    (p.status = 'Belum Dibayar' OR p.status = 'Belum Lunas')
-ORDER BY p.tgl_tempo ASC";
+try {
+    // Query Data Mentah Faktur Belum Lunas
+    $sql = "SELECT 
+        p.no_faktur,
+        p.no_order,
+        s.nama_suplier, 
+        pt.nama AS nama_petugas,
+        p.tgl_tempo,
+        p.tgl_pesan,
+        p.tgl_faktur,
+        b.nm_bangsal,
+        p.tagihan,
+        COALESCE(
+            (SELECT SUM(besar_bayar) 
+             FROM bayar_pemesanan 
+             WHERE bayar_pemesanan.no_faktur = p.no_faktur
+            ), 0
+        ) AS cicilan_dibayar,
+        s.nama_bank,
+        s.rekening 
+    FROM pemesanan p
+    INNER JOIN datasuplier s ON p.kode_suplier = s.kode_suplier 
+    INNER JOIN bangsal b ON p.kd_bangsal = b.kd_bangsal 
+    INNER JOIN petugas pt ON p.nip = pt.nip 
+    WHERE 
+        (p.status = 'Belum Dibayar' OR p.status = 'Belum Lunas')
+    ORDER BY p.tgl_tempo ASC";
 
-$result = $koneksi->query($sql);
+    $stmt = $koneksi_pdo->query($sql);
 
-if ($result && $result->num_rows > 0) {
     // Current date to determine overdue
     $current_date = date('Y-m-d');
     
     $suplier_data = [];
     $bulan_data = [];
 
-    while ($row = $result->fetch_assoc()) {
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $tagihan = floatval($row['tagihan']);
         $cicilan = floatval($row['cicilan_dibayar']);
         $sisa_hutang = $tagihan - $cicilan;
@@ -113,6 +113,8 @@ if ($result && $result->num_rows > 0) {
         $response['chart']['tempo_bulan']['labels'][] = $label;
         $response['chart']['tempo_bulan']['data'][] = $total;
     }
+} catch (PDOException $e) {
+    // Return safe default
 }
 
 echo json_encode($response);

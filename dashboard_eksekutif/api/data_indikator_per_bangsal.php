@@ -23,51 +23,55 @@ $start = new DateTime($tgl_awal);
 $end = new DateTime($tgl_akhir);
 $days_period = $end->diff($start)->days + 1;
 
-// 3. Ambil Data Master Bangsal & Jumlah Bed (A)
-// Kita hanya mengambil bangsal yang memiliki kamar aktif
-$bangsal_data = [];
-$sql_bed = "
-    SELECT 
-        bangsal.kd_bangsal, 
-        bangsal.nm_bangsal, 
-        COUNT(kamar.kd_kamar) as jumlah_bed
-    FROM bangsal 
-    INNER JOIN kamar ON bangsal.kd_bangsal = kamar.kd_bangsal
-    WHERE kamar.statusdata='1' 
-    GROUP BY bangsal.kd_bangsal
-    ORDER BY bangsal.nm_bangsal ASC
-";
-$res_bed = $koneksi->query($sql_bed);
-while($row = $res_bed->fetch_assoc()) {
-    $bangsal_data[$row['kd_bangsal']] = [
-        'nm_bangsal' => $row['nm_bangsal'],
-        'bed' => (int)$row['jumlah_bed'],
-        'hp' => 0,
-        'd' => 0,
-        'mati' => 0,
-        'mati_48' => 0
-    ];
-}
+$final_data = [];
 
-// 4. Ambil Data Transaksi Pasien per Bangsal
-// Join kamar_inap -> kamar -> bangsal
-// Logika D: Hitung semua baris (Termasuk Pindah Kamar)
-$sql_transaksi = "
-    SELECT 
-        kamar.kd_bangsal,
-        SUM(IF(DATEDIFF(ki.tgl_keluar, ki.tgl_masuk) = 0, 1, DATEDIFF(ki.tgl_keluar, ki.tgl_masuk))) as total_hp,
-        COUNT(ki.no_rawat) as total_keluar,
-        SUM(IF(ki.stts_pulang = 'Meninggal', 1, 0)) as total_mati,
-        SUM(IF(ki.stts_pulang = 'Meninggal' AND DATEDIFF(ki.tgl_keluar, ki.tgl_masuk) >= 2, 1, 0)) as mati_lebih_48
-    FROM kamar_inap ki
-    INNER JOIN kamar ON ki.kd_kamar = kamar.kd_kamar
-    WHERE ki.tgl_keluar BETWEEN '$tgl_awal' AND '$tgl_akhir'
-    GROUP BY kamar.kd_bangsal
-";
+try {
+    // 3. Ambil Data Master Bangsal & Jumlah Bed (A)
+    // Kita hanya mengambil bangsal yang memiliki kamar aktif
+    $bangsal_data = [];
+    $sql_bed = "
+        SELECT 
+            bangsal.kd_bangsal, 
+            bangsal.nm_bangsal, 
+            COUNT(kamar.kd_kamar) as jumlah_bed
+        FROM bangsal 
+        INNER JOIN kamar ON bangsal.kd_bangsal = kamar.kd_bangsal
+        WHERE kamar.statusdata='1' 
+        GROUP BY bangsal.kd_bangsal
+        ORDER BY bangsal.nm_bangsal ASC
+    ";
+    $stmt_bed = $koneksi_pdo->query($sql_bed);
+    while($row = $stmt_bed->fetch(PDO::FETCH_ASSOC)) {
+        $bangsal_data[$row['kd_bangsal']] = [
+            'nm_bangsal' => $row['nm_bangsal'],
+            'bed' => (int)$row['jumlah_bed'],
+            'hp' => 0,
+            'd' => 0,
+            'mati' => 0,
+            'mati_48' => 0
+        ];
+    }
 
-$res_trans = $koneksi->query($sql_transaksi);
-if ($res_trans) {
-    while($row = $res_trans->fetch_assoc()) {
+    // 4. Ambil Data Transaksi Pasien per Bangsal
+    // Join kamar_inap -> kamar -> bangsal
+    // Logika D: Hitung semua baris (Termasuk Pindah Kamar)
+    $sql_transaksi = "
+        SELECT 
+            kamar.kd_bangsal,
+            SUM(IF(DATEDIFF(ki.tgl_keluar, ki.tgl_masuk) = 0, 1, DATEDIFF(ki.tgl_keluar, ki.tgl_masuk))) as total_hp,
+            COUNT(ki.no_rawat) as total_keluar,
+            SUM(IF(ki.stts_pulang = 'Meninggal', 1, 0)) as total_mati,
+            SUM(IF(ki.stts_pulang = 'Meninggal' AND DATEDIFF(ki.tgl_keluar, ki.tgl_masuk) >= 2, 1, 0)) as mati_lebih_48
+        FROM kamar_inap ki
+        INNER JOIN kamar ON ki.kd_kamar = kamar.kd_kamar
+        WHERE ki.tgl_keluar BETWEEN :tgl_awal AND :tgl_akhir
+        GROUP BY kamar.kd_bangsal
+    ";
+
+    $stmt_trans = $koneksi_pdo->prepare($sql_transaksi);
+    $stmt_trans->execute([':tgl_awal' => $tgl_awal, ':tgl_akhir' => $tgl_akhir]);
+    
+    while($row = $stmt_trans->fetch(PDO::FETCH_ASSOC)) {
         $kd = $row['kd_bangsal'];
         // Update array master jika bangsal ada (jika bangsal tidak punya bed aktif, diabaikan)
         if (isset($bangsal_data[$kd])) {
@@ -77,41 +81,42 @@ if ($res_trans) {
             $bangsal_data[$kd]['mati_48'] = (int)$row['mati_lebih_48'];
         }
     }
-}
 
-// 5. Kalkulasi Indikator per Bangsal
-$final_data = [];
-foreach ($bangsal_data as $row) {
-    $bed = $row['bed'];
-    $hp = $row['hp'];
-    $d = $row['d'];
-    $mati = $row['mati'];
-    $mati_48 = $row['mati_48'];
+    // 5. Kalkulasi Indikator per Bangsal
+    foreach ($bangsal_data as $row) {
+        $bed = $row['bed'];
+        $hp = $row['hp'];
+        $d = $row['d'];
+        $mati = $row['mati'];
+        $mati_48 = $row['mati_48'];
 
-    // Mencegah division by zero
-    $pembagi_d = ($d == 0) ? 1 : $d;
-    $pembagi_bed = ($bed == 0) ? 1 : $bed;
+        // Mencegah division by zero
+        $pembagi_d = ($d == 0) ? 1 : $d;
+        $pembagi_bed = ($bed == 0) ? 1 : $bed;
 
-    // Rumus Barber Johnson
-    $bor = ($hp / ($bed * $days_period)) * 100;
-    $alos = $hp / $pembagi_d;
-    $toi = (($bed * $days_period) - $hp) / $pembagi_d;
-    $bto = $d / $pembagi_bed;
-    $gdr = ($mati / $pembagi_d) * 1000;
-    $ndr = ($mati_48 / $pembagi_d) * 1000;
+        // Rumus Barber Johnson
+        $bor = ($hp / ($bed * $days_period)) * 100;
+        $alos = $hp / $pembagi_d;
+        $toi = (($bed * $days_period) - $hp) / $pembagi_d;
+        $bto = $d / $pembagi_bed;
+        $gdr = ($mati / $pembagi_d) * 1000;
+        $ndr = ($mati_48 / $pembagi_d) * 1000;
 
-    $final_data[] = [
-        'bangsal' => $row['nm_bangsal'],
-        'bed' => $bed,
-        'hp' => $hp,
-        'd' => $d, // Ini sudah termasuk Pindah Kamar
-        'bor' => round($bor, 2),
-        'alos' => round($alos, 2),
-        'toi' => round($toi, 2),
-        'bto' => round($bto, 2),
-        'gdr' => round($gdr, 2),
-        'ndr' => round($ndr, 2)
-    ];
+        $final_data[] = [
+            'bangsal' => $row['nm_bangsal'],
+            'bed' => $bed,
+            'hp' => $hp,
+            'd' => $d, // Ini sudah termasuk Pindah Kamar
+            'bor' => round($bor, 2),
+            'alos' => round($alos, 2),
+            'toi' => round($toi, 2),
+            'bto' => round($bto, 2),
+            'gdr' => round($gdr, 2),
+            'ndr' => round($ndr, 2)
+        ];
+    }
+} catch (PDOException $e) {
+    // Return empty json with safe default
 }
 
 // 6. Kirim Response

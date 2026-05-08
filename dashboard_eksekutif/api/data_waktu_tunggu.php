@@ -6,7 +6,7 @@ header('Content-Type: application/json');
 // Ambil parameter tanggal
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
-$keyword = isset($_GET['keyword']) ? $koneksi->real_escape_string($_GET['keyword']) : '';
+$keyword = isset($_GET['keyword']) ? $_GET['keyword'] : '';
 
 $response = [
     'summary' => [
@@ -25,46 +25,57 @@ $response = [
     'data' => []
 ];
 
-// Query Base: Mengambil data registrasi dan titik waktu pertama dari poli & resep
-// (Kita modifikasi dari panduan agar subquery langsung di-JOIN/SELECT)
-$sql = "SELECT 
-    reg_periksa.no_rawat,
-    reg_periksa.no_rkm_medis,
-    pasien.nm_pasien,
-    poliklinik.nm_poli,
-    dokter.nm_dokter,
-    penjab.png_jawab,
-    reg_periksa.tgl_registrasi,
-    reg_periksa.jam_reg,
-    reg_periksa.status_lanjut,
-    
-    (SELECT jam_rawat FROM pemeriksaan_ralan WHERE no_rawat = reg_periksa.no_rawat ORDER BY tgl_perawatan ASC, jam_rawat ASC LIMIT 1) as jam_periksa,
-    (SELECT jam_peresepan FROM resep_obat WHERE no_rawat = reg_periksa.no_rawat ORDER BY tgl_peresepan ASC, jam_peresepan ASC LIMIT 1) as jam_resep,
-    (SELECT jam FROM resep_obat WHERE no_rawat = reg_periksa.no_rawat ORDER BY tgl_peresepan ASC, jam_peresepan ASC LIMIT 1) as jam_selesai_obat,
-    (SELECT jam FROM nota_jalan WHERE no_rawat = reg_periksa.no_rawat ORDER BY tanggal ASC, jam ASC LIMIT 1) as jam_kasir
-    
-FROM reg_periksa 
-INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis 
-INNER JOIN poliklinik ON reg_periksa.kd_poli = poliklinik.kd_poli 
-INNER JOIN dokter ON reg_periksa.kd_dokter = dokter.kd_dokter 
-INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj 
-WHERE reg_periksa.stts <> 'Batal' 
-  AND reg_periksa.tgl_registrasi BETWEEN '$tgl_awal' AND '$tgl_akhir'";
+try {
+    // Query Base: Mengambil data registrasi dan titik waktu pertama dari poli & resep
+    // (Kita modifikasi dari panduan agar subquery langsung di-JOIN/SELECT)
+    $sql = "SELECT 
+        reg_periksa.no_rawat,
+        reg_periksa.no_rkm_medis,
+        pasien.nm_pasien,
+        poliklinik.nm_poli,
+        dokter.nm_dokter,
+        penjab.png_jawab,
+        reg_periksa.tgl_registrasi,
+        reg_periksa.jam_reg,
+        reg_periksa.status_lanjut,
+        
+        (SELECT jam_rawat FROM pemeriksaan_ralan WHERE no_rawat = reg_periksa.no_rawat ORDER BY tgl_perawatan ASC, jam_rawat ASC LIMIT 1) as jam_periksa,
+        (SELECT jam_peresepan FROM resep_obat WHERE no_rawat = reg_periksa.no_rawat ORDER BY tgl_peresepan ASC, jam_peresepan ASC LIMIT 1) as jam_resep,
+        (SELECT jam FROM resep_obat WHERE no_rawat = reg_periksa.no_rawat ORDER BY tgl_peresepan ASC, jam_peresepan ASC LIMIT 1) as jam_selesai_obat,
+        (SELECT jam FROM nota_jalan WHERE no_rawat = reg_periksa.no_rawat ORDER BY tanggal ASC, jam ASC LIMIT 1) as jam_kasir
+        
+    FROM reg_periksa 
+    INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis 
+    INNER JOIN poliklinik ON reg_periksa.kd_poli = poliklinik.kd_poli 
+    INNER JOIN dokter ON reg_periksa.kd_dokter = dokter.kd_dokter 
+    INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj 
+    WHERE reg_periksa.stts <> 'Batal' 
+      AND reg_periksa.tgl_registrasi BETWEEN :tgl_awal AND :tgl_akhir";
 
-$kd_pj = isset($_GET['kd_pj']) ? $koneksi->real_escape_string($_GET['kd_pj']) : '';
-if (!empty($kd_pj)) {
-    $sql .= " AND reg_periksa.kd_pj = '$kd_pj'";
-}
+    $params = [
+        ':tgl_awal' => $tgl_awal,
+        ':tgl_akhir' => $tgl_akhir
+    ];
 
-if (!empty($keyword)) {
-    $sql .= " AND (reg_periksa.no_rawat LIKE '%$keyword%' OR reg_periksa.no_rkm_medis LIKE '%$keyword%' OR pasien.nm_pasien LIKE '%$keyword%')";
-}
+    $kd_pj = isset($_GET['kd_pj']) ? $_GET['kd_pj'] : '';
+    if (!empty($kd_pj)) {
+        $sql .= " AND reg_periksa.kd_pj = :kd_pj";
+        $params[':kd_pj'] = $kd_pj;
+    }
 
-$sql .= " ORDER BY reg_periksa.tgl_registrasi ASC, reg_periksa.jam_reg ASC";
+    if (!empty($keyword)) {
+        $sql .= " AND (reg_periksa.no_rawat LIKE :keyword1 OR reg_periksa.no_rkm_medis LIKE :keyword2 OR pasien.nm_pasien LIKE :keyword3)";
+        $keyword_param = "%" . $keyword . "%";
+        $params[':keyword1'] = $keyword_param;
+        $params[':keyword2'] = $keyword_param;
+        $params[':keyword3'] = $keyword_param;
+    }
 
-$result = $koneksi->query($sql);
+    $sql .= " ORDER BY reg_periksa.tgl_registrasi ASC, reg_periksa.jam_reg ASC";
 
-if ($result) {
+    $stmt = $koneksi_pdo->prepare($sql);
+    $stmt->execute($params);
+
     $sum_daftar_periksa = 0;
     $count_daftar_periksa = 0;
     
@@ -80,7 +91,7 @@ if ($result) {
     // Untuk grouping chart harian
     $daily_stats = [];
 
-    while ($row = $result->fetch_assoc()) {
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $tgl_reg = $row['tgl_registrasi'];
         $jam_reg = $row['jam_reg'];
         $jam_periksa = $row['jam_periksa'];
@@ -178,9 +189,8 @@ if ($result) {
         $response['chart']['data_resep_obat'][] = $avg_ro;
         $response['chart']['data_total_kasir'][] = $avg_ks;
     }
-} else {
-    // Log db error for backend debugging if needed
-    // error_log("DB Query Error: " . $koneksi->error);
+} catch (PDOException $e) {
+    // Error logged or safely return valid empty response
 }
 
 echo json_encode($response);
