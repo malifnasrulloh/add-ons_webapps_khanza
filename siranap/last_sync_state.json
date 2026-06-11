@@ -1,0 +1,106 @@
+{
+    "12_Kelas I_0": {
+        "id_tt": "12",
+        "ruang": "Kelas I",
+        "jumlah_ruang": "1",
+        "jumlah": "1",
+        "terpakai": "0",
+        "covid": 0
+    },
+    "3_Kelas I_0": {
+        "id_tt": "3",
+        "ruang": "Kelas I",
+        "jumlah_ruang": "1",
+        "jumlah": "11",
+        "terpakai": "3",
+        "covid": 0
+    },
+    "38_Kelas II_0": {
+        "id_tt": "38",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "3",
+        "terpakai": "0",
+        "covid": 0
+    },
+    "39_Kelas II_0": {
+        "id_tt": "39",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "1",
+        "terpakai": "0",
+        "covid": 0
+    },
+    "4_Kelas II_0": {
+        "id_tt": "4",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "16",
+        "terpakai": "8",
+        "covid": 0
+    },
+    "5_Kelas III_0": {
+        "id_tt": "5",
+        "ruang": "Kelas III",
+        "jumlah_ruang": "1",
+        "jumlah": "6",
+        "terpakai": "2",
+        "covid": 0
+    },
+    "1_VVIP_0": {
+        "id_tt": "1",
+        "ruang": "VVIP",
+        "jumlah_ruang": "1",
+        "jumlah": "0",
+        "terpakai": "0",
+        "covid": 0
+    },
+    "1_Kelas II_0": {
+        "id_tt": "1",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "1",
+        "terpakai": "0",
+        "covid": 0
+    },
+    "11_Kelas II_0": {
+        "id_tt": "11",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "1",
+        "terpakai": "1",
+        "covid": 0
+    },
+    "12_Kelas II_0": {
+        "id_tt": "12",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "1",
+        "terpakai": "0",
+        "covid": 0
+    },
+    "14_Kelas II_0": {
+        "id_tt": "14",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "4",
+        "terpakai": "0",
+        "covid": 0
+    },
+    "6_Kelas II_0": {
+        "id_tt": "6",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "1",
+        "terpakai": "0",
+        "covid": 0
+    },
+    "7_Kelas II_0": {
+        "id_tt": "7",
+        "ruang": "Kelas II",
+        "jumlah_ruang": "1",
+        "jumlah": "2",
+        "terpakai": "0",
+        "covid": 0
+    }
+}
