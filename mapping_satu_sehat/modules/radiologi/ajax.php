@@ -139,7 +139,7 @@ try {
             $isFallback = true;
         }
 
-        $stmt = $pdo->prepare("SELECT loinc_num as id, CONCAT(loinc_num,' - ',long_common_name) as text, long_common_name as display FROM satu_sehat_ref_loinc WHERE long_common_name LIKE :q OR loinc_num LIKE :q LIMIT 20");
+        $stmt = $pdo->prepare("SELECT loinc_num as id, CONCAT(loinc_num,' - ',long_common_name) as text, long_common_name as display, system_type, method_typ, property, class, shortname FROM satu_sehat_ref_loinc WHERE long_common_name LIKE :q OR loinc_num LIKE :q LIMIT 20");
         $stmt->execute([':q' => "%$q%"]);
         echo json_encode(['results' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'source' => $isFallback ? 'fallback' : 'database']);
         exit;

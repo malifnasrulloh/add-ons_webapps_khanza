@@ -26,7 +26,16 @@ $tabs = [
         'label'   => 'LOINC',
         'icon'    => 'fa-flask',
         'color'   => '#0891b2',
-        'cols'    => ['loinc_num' => 'Kode LOINC', 'component' => 'Component', 'long_common_name' => 'Long Common Name'],
+        'cols'    => [
+            'loinc_num' => 'Kode LOINC', 
+            'component' => 'Component', 
+            'long_common_name' => 'Long Common Name',
+            'system_type' => 'System',
+            'method_typ' => 'Method',
+            'property' => 'Property',
+            'class' => 'Class',
+            'shortname' => 'Short Name'
+        ],
         'pk'      => 'loinc_num',
         'system'  => 'http://loinc.org',
     ],

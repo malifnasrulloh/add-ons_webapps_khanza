@@ -105,7 +105,10 @@ check_module_access('satu_sehat_mapping_lab');
                     <div class="mb-3">
                         <label class="form-label fw-bold text-primary">1. Kode Pemeriksaan (LOINC)</label>
                         <select class="form-select" id="sel_loinc" name="loinc_code" style="width:100%" required></select>
-                        <div class="mt-1"><span id="loinc_source_badge" class="badge bg-secondary" style="font-size:.7rem;"><i class="fa fa-database me-1"></i>Sumber: Database Lokal</span></div>
+                        <div class="mt-1">
+                            <span id="loinc_source_badge" class="badge bg-secondary" style="font-size:.7rem;"><i class="fa fa-database me-1"></i>Sumber: Database Lokal</span>
+                            <a id="loinc_ext_link" href="#" target="_blank" class="badge bg-info text-dark text-decoration-none ms-1" style="font-size:.7rem; display:none;"><i class="fa fa-external-link me-1"></i>Detail di LOINC.org</a>
+                        </div>
                         <input type="hidden" name="loinc_display" id="m_loinc_display">
                         <div class="form-text">Cari dalam Bahasa Inggris. System: <i>http://loinc.org</i></div>
                     </div>
@@ -210,6 +213,28 @@ $(function() {
         else                           b.addClass('bg-secondary').html('<i class="fa fa-database me-1"></i>Sumber: Database Lokal');
     }
 
+    function formatLoinc(repo) {
+        if (repo.loading) return repo.text;
+        
+        let badges = '';
+        if (repo.system_type) badges += `<span class="badge bg-success me-1"><i class="fa fa-cogs"></i> Sys: ${repo.system_type}</span>`;
+        if (repo.class) badges += `<span class="badge bg-primary me-1"><i class="fa fa-folder"></i> Cls: ${repo.class}</span>`;
+        if (repo.method_typ) badges += `<span class="badge bg-secondary me-1"><i class="fa fa-flask"></i> Mthd: ${repo.method_typ}</span>`;
+        if (repo.property) badges += `<span class="badge bg-dark me-1"><i class="fa fa-tag"></i> Prop: ${repo.property}</span>`;
+        
+        var $container = $(
+            "<div class='select2-result-repository clearfix'>" +
+              "<div class='select2-result-repository__title fw-bold mb-1'>" + repo.id + " - " + repo.display + "</div>" +
+              "<div class='select2-result-repository__badges' style='font-size: 0.75rem;'>" + badges + "</div>" +
+            "</div>"
+        );
+        return $container;
+    }
+
+    function formatLoincSelection(repo) {
+        return repo.text || repo.id;
+    }
+
     $('#sel_loinc').select2({
         theme: 'bootstrap-5', dropdownParent: $('#modalMapping'),
         placeholder: 'Cari Kode LOINC...', minimumInputLength: 2,
@@ -222,8 +247,15 @@ $(function() {
                 return { results: d.results };
             },
             error: function() { fhirSetBadge('loinc_source_badge', 'fallback'); }
-        }
-    }).on('select2:select', function(e) { $('#m_loinc_display').val(e.params.data.display); });
+        },
+        templateResult: formatLoinc,
+        templateSelection: formatLoincSelection
+    }).on('select2:select', function(e) { 
+        $('#m_loinc_display').val(e.params.data.display); 
+        $('#loinc_ext_link').attr('href', 'https://loinc.org/' + e.params.data.id).show();
+    }).on('select2:clear', function(e) {
+        $('#loinc_ext_link').hide();
+    });
 
     $('#sel_snomed').select2({
         theme: 'bootstrap-5', dropdownParent: $('#modalMapping'),

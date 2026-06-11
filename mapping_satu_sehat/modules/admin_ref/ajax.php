@@ -20,7 +20,7 @@ $action = $_GET['action'] ?? '';
 
 $table_map = [
     'kfa'    => ['table' => 'satu_sehat_ref_kfa',    'pk' => 'kfa_code',    'cols' => ['kfa_code', 'display_name']],
-    'loinc'  => ['table' => 'satu_sehat_ref_loinc',  'pk' => 'loinc_num',  'cols' => ['loinc_num', 'component', 'long_common_name']],
+    'loinc'  => ['table' => 'satu_sehat_ref_loinc',  'pk' => 'loinc_num',  'cols' => ['loinc_num', 'component', 'long_common_name', 'system_type', 'method_typ', 'property', 'class', 'shortname']],
     'snomed' => ['table' => 'satu_sehat_ref_snomed',  'pk' => 'conceptId', 'cols' => ['conceptId', 'term']],
 ];
 
