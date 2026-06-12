@@ -291,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label class="form-label small fw-semibold">Username</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="fa fa-user"></i></span>
-                    <input type="text" id="username" name="username" class="form-control"
+                    <input type="password" id="username" name="username" class="form-control"
                            placeholder="Masukkan username"
                            value="<?= htmlspecialchars($_POST['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                            autocomplete="username" required>

@@ -249,7 +249,7 @@ if (isset($koneksi)) {
 
         <div class="mb-3">
             <label for="username" class="form-label">Username / NIP</label>
-            <input type="text" class="form-control" id="username" name="username"
+            <input type="password" class="form-control" id="username" name="username"
                    placeholder="Masukkan ID Pengguna" required autofocus
                    <?php echo ($sisa_lockout > 0) ? 'disabled' : ''; ?>>
         </div>
