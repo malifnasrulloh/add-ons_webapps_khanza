@@ -147,15 +147,43 @@ try {
         if ($searchMode === 'api') {
             $apiData = fhir_search_loinc($q);
             if ($apiData['status'] === 'success') {
-                echo json_encode(['results' => $apiData['results'], 'source' => 'api']);
+                echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
                 exit;
             }
             $isFallback = true;
         }
 
-        $stmt = $pdo->prepare("SELECT loinc_num as id, CONCAT(loinc_num,' - ',long_common_name) as text, long_common_name as display, system_type, method_typ, property, class, shortname FROM satu_sehat_ref_loinc WHERE long_common_name LIKE :q OR loinc_num LIKE :q LIMIT 20");
-        $stmt->execute([':q' => "%$q%"]);
-        echo json_encode(['results' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'source' => $isFallback ? 'fallback' : 'database']);
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        // Count total for pagination
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_loinc WHERE long_common_name LIKE :q OR loinc_num LIKE :q");
+        $stmtCount->execute([':q' => "%$q%"]);
+        $total = $stmtCount->fetchColumn();
+        $more = ($offset + $limit) < $total;
+
+        $stmt = $pdo->prepare("
+            SELECT loinc_num as id, CONCAT(loinc_num,' - ',long_common_name) as text, long_common_name as display, 
+                   system_type, method_typ, property, class, shortname 
+            FROM satu_sehat_ref_loinc 
+            WHERE long_common_name LIKE :q OR loinc_num LIKE :q 
+            ORDER BY 
+                CASE WHEN loinc_num = :exact THEN 0 ELSE 1 END,
+                long_common_name ASC 
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':exact', $q);
+        $stmt->bindValue(':q', "%$q%");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        echo json_encode([
+            'results' => $stmt->fetchAll(PDO::FETCH_ASSOC), 
+            'source' => $isFallback ? 'fallback' : 'database',
+            'pagination' => ['more' => $more]
+        ]);
         exit;
     }
 

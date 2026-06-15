@@ -232,11 +232,15 @@ $(function() {
         placeholder: 'Cari kode LOINC...', minimumInputLength: 2,
         ajax: {
             url: 'ajax.php?action=search_loinc', dataType: 'json', delay: 300,
-            data: function(p) { return { term: p.term }; },
+            data: function(p) { return { term: p.term, page: p.page || 1 }; },
             beforeSend: function() { fhirSetBadge('loinc_source_badge_rad', 'loading'); },
-            processResults: function(d) {
+            processResults: function(d, params) {
                 fhirSetBadge('loinc_source_badge_rad', d.source || 'database');
-                return { results: d.results };
+                params.page = params.page || 1;
+                return { 
+                    results: d.results,
+                    pagination: { more: d.pagination ? d.pagination.more : false }
+                };
             },
             error: function() { fhirSetBadge('loinc_source_badge_rad', 'fallback'); }
         },
