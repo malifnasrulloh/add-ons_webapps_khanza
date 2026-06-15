@@ -266,11 +266,15 @@ $(function() {
         placeholder: 'Cari Spesimen/Sampel (SNOMED-CT)...', minimumInputLength: 2,
         ajax: {
             url: 'ajax.php?action=search_snomed', dataType: 'json', delay: 300,
-            data: function(p) { return { term: p.term }; },
+            data: function(p) { return { term: p.term, page: p.page || 1 }; },
             beforeSend: function() { fhirSetBadge('snomed_source_badge', 'loading'); },
-            processResults: function(d) {
+            processResults: function(d, params) {
                 fhirSetBadge('snomed_source_badge', d.source || 'database');
-                return { results: d.results };
+                params.page = params.page || 1;
+                return { 
+                    results: d.results,
+                    pagination: { more: d.pagination ? d.pagination.more : false }
+                };
             },
             error: function() { fhirSetBadge('snomed_source_badge', 'fallback'); }
         }

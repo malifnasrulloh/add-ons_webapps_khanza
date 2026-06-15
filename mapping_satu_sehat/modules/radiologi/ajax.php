@@ -188,15 +188,41 @@ try {
         if ($searchMode === 'api') {
             $apiData = fhir_search_snomed($q);
             if ($apiData['status'] === 'success') {
-                echo json_encode(['results' => $apiData['results'], 'source' => 'api']);
+                echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
                 exit;
             }
             $isFallback = true;
         }
 
-        $stmt = $pdo->prepare("SELECT conceptId as id, CONCAT(conceptId,' - ',term) as text, term as display FROM satu_sehat_ref_snomed WHERE term LIKE :q OR conceptId LIKE :q LIMIT 20");
-        $stmt->execute([':q' => "%$q%"]);
-        echo json_encode(['results' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'source' => $isFallback ? 'fallback' : 'database']);
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_snomed WHERE term LIKE :q OR conceptId LIKE :q");
+        $stmtCount->execute([':q' => "%$q%"]);
+        $total = $stmtCount->fetchColumn();
+        $more = ($offset + $limit) < $total;
+
+        $stmt = $pdo->prepare("
+            SELECT conceptId as id, CONCAT(conceptId,' - ',term) as text, term as display 
+            FROM satu_sehat_ref_snomed 
+            WHERE term LIKE :q OR conceptId LIKE :q 
+            ORDER BY 
+                CASE WHEN conceptId = :exact THEN 0 ELSE 1 END,
+                term ASC 
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':exact', $q);
+        $stmt->bindValue(':q', "%$q%");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        echo json_encode([
+            'results' => $stmt->fetchAll(PDO::FETCH_ASSOC), 
+            'source' => $isFallback ? 'fallback' : 'database',
+            'pagination' => ['more' => $more]
+        ]);
         exit;
     }
 

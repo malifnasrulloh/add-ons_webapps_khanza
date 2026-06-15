@@ -166,7 +166,8 @@ try {
                 // Berhasil dari API — return dengan flag source=api untuk frontend auto-fill
                 echo json_encode([
                     'results' => $apiResults,
-                    'source'  => 'api'
+                    'source'  => 'api',
+                    'pagination' => ['more' => false]
                 ]);
                 exit;
             }
@@ -174,24 +175,42 @@ try {
             $isFallback = true;
         }
 
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_kfa WHERE display_name LIKE :q OR kfa_code LIKE :q");
+        $stmtCount->execute([':q' => "%$q%"]);
+        $total = $stmtCount->fetchColumn();
+        $more = ($offset + $limit) < $total;
+
         // ---- Mode Database (atau fallback dari API) ----
-        $stmt = $pdo->prepare(
-            "SELECT kfa_code as id,
-                    CONCAT(kfa_code, ' - ', display_name) as text,
-                    display_name,
-                    '' as route_code,
-                    '' as route_display,
-                    '' as form_code,
-                    '' as form_display,
-                    '' as ucum_code
-             FROM satu_sehat_ref_kfa
-             WHERE display_name LIKE :q OR kfa_code LIKE :q
-             LIMIT 20"
-        );
-        $stmt->execute([':q' => "%$q%"]);
+        $stmt = $pdo->prepare("
+            SELECT kfa_code as id,
+                   CONCAT(kfa_code, ' - ', display_name) as text,
+                   display_name,
+                   '' as route_code,
+                   '' as route_display,
+                   '' as form_code,
+                   '' as form_display,
+                   '' as ucum_code
+            FROM satu_sehat_ref_kfa
+            WHERE display_name LIKE :q OR kfa_code LIKE :q
+            ORDER BY 
+                CASE WHEN kfa_code = :exact THEN 0 ELSE 1 END,
+                display_name ASC 
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':exact', $q);
+        $stmt->bindValue(':q', "%$q%");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        
         echo json_encode([
             'results' => $stmt->fetchAll(PDO::FETCH_ASSOC),
-            'source'  => $isFallback ? 'fallback' : 'database'
+            'source'  => $isFallback ? 'fallback' : 'database',
+            'pagination' => ['more' => $more]
         ]);
         exit;
     }

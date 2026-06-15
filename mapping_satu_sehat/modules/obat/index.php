@@ -374,13 +374,13 @@ $(function() {
             delay: 300,
             data: function(params) {
                 kfaLastTerm = params.term; // Simpan term untuk retry
-                return { term: params.term };
+                return { term: params.term, page: params.page || 1 };
             },
             beforeSend: function() {
                 kfaSetBadge('loading');
                 $('#kfa_autofill_notice').hide();
             },
-            processResults: function(data) {
+            processResults: function(data, params) {
                 kfaLastSource = data.source || 'database';
                 if (kfaLastSource === 'api') {
                     kfaSetBadge('api');
@@ -389,7 +389,11 @@ $(function() {
                 } else {
                     kfaSetBadge('database');
                 }
-                return { results: data.results };
+                params.page = params.page || 1;
+                return { 
+                    results: data.results,
+                    pagination: { more: data.pagination ? data.pagination.more : false }
+                };
             },
             error: function() {
                 kfaSetBadge('fallback');

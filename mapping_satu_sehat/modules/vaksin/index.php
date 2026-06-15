@@ -301,13 +301,13 @@ $(function() {
             delay: 300,
             data: function(params) {
                 kfaVaksinLastTerm = params.term;
-                return { term: params.term };
+                return { term: params.term, page: params.page || 1 };
             },
             beforeSend: function() {
                 kfaSetBadgeVaksin('loading');
                 $('#kfa_vaksin_autofill_notice').hide();
             },
-            processResults: function(data) {
+            processResults: function(data, params) {
                 kfaVaksinLastSource = data.source || 'database';
                 if (kfaVaksinLastSource === 'api') {
                     kfaSetBadgeVaksin('api');
@@ -316,7 +316,11 @@ $(function() {
                 } else {
                     kfaSetBadgeVaksin('database');
                 }
-                return { results: data.results };
+                params.page = params.page || 1;
+                return { 
+                    results: data.results,
+                    pagination: { more: data.pagination ? data.pagination.more : false }
+                };
             },
             error: function() { kfaSetBadgeVaksin('fallback'); },
             cache: false
