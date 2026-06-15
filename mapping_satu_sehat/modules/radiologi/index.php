@@ -115,7 +115,10 @@ check_module_access('satu_sehat_mapping_radiologi');
                 <div class="mb-3">
                     <label class="form-label fw-bold text-success">2. Kode Spesimen/Lokasi (SNOMED-CT) <span class="text-muted fw-normal small">— opsional</span></label>
                     <select class="form-select" id="sel_snomed_rad" style="width:100%"></select>
-                    <div class="mt-1"><span id="snomed_source_badge_rad" class="badge bg-secondary" style="font-size:.7rem;"><i class="fa fa-database me-1"></i>Sumber: Database Lokal</span></div>
+                    <div class="mt-1">
+                        <span id="snomed_source_badge_rad" class="badge bg-secondary" style="font-size:.7rem;"><i class="fa fa-database me-1"></i>Sumber: Database Lokal</span>
+                        <a id="snomed_ext_link_rad" href="#" target="_blank" class="badge bg-success text-white text-decoration-none ms-1" style="font-size:.7rem; display:none;"><i class="fa fa-external-link me-1"></i>SNOMED Browser</a>
+                    </div>
                     <input type="hidden" id="m_snomed_display_rad">
                     <div class="form-text">Contoh: tubuh yang difoto. System: <i>http://snomed.info/sct</i></div>
                 </div>
@@ -253,6 +256,35 @@ $(function() {
         $('#loinc_ext_link_rad').hide();
     });
 
+    function formatSnomed(repo) {
+        if (repo.loading) return repo.text;
+        
+        let term = repo.display || repo.text || '';
+        let semanticTag = '';
+        let match = term.match(/\(([^)]+)\)$/);
+        if (match) {
+            semanticTag = match[1];
+            term = term.replace(/\([^)]+\)$/, '').trim();
+        }
+        
+        let badges = `<span class="badge bg-success me-1" style="opacity:0.9"><i class="fa fa-fingerprint"></i> SNOMED-CT</span>`;
+        if (semanticTag) {
+            badges += `<span class="badge bg-secondary me-1"><i class="fa fa-tag"></i> ${semanticTag}</span>`;
+        }
+        
+        var $container = $(
+            "<div class='select2-result-repository clearfix'>" +
+              "<div class='select2-result-repository__title fw-bold mb-1'>" + repo.id + " - " + term + "</div>" +
+              "<div class='select2-result-repository__badges' style='font-size: 0.75rem;'>" + badges + "</div>" +
+            "</div>"
+        );
+        return $container;
+    }
+
+    function formatSnomedSelection(repo) {
+        return repo.text || repo.id;
+    }
+
     $('#sel_snomed_rad').select2({
         theme: 'bootstrap-5', dropdownParent: $('#modalMappingRad'),
         placeholder: 'Cari Spesimen/Lokasi...', minimumInputLength: 2, allowClear: true,
@@ -269,18 +301,41 @@ $(function() {
                 };
             },
             error: function() { fhirSetBadge('snomed_source_badge_rad', 'fallback'); }
-        }
-    }).on('select2:select', function(e) { $('#m_snomed_display_rad').val(e.params.data.display); });
+        },
+        templateResult: formatSnomed,
+        templateSelection: formatSnomedSelection
+    }).on('select2:select', function(e) { 
+        $('#m_snomed_display_rad').val(e.params.data.display); 
+        $('#snomed_ext_link_rad').attr('href', 'https://browser.ihtsdotools.org/?perspective=full&conceptId1=' + e.params.data.id).show();
+    }).on('select2:clear', function(e) {
+        $('#m_snomed_display_rad').val('');
+        $('#snomed_ext_link_rad').hide();
+    });
 
     $('#tableRad tbody').on('click','.btn-map',function(){
         var kd=$(this).data('kd'),nama=$(this).data('nama'),code=$(this).data('code'),disp=$(this).data('display'),sc=$(this).data('sampel-code'),sd=$(this).data('sampel-display');
         $('#m_kd_jenis_prw').val(kd); $('#m_nama_rad').text(nama); $('#m_kd_rad').text(kd);
         fhirSetBadge('loinc_source_badge_rad', 'database');
         fhirSetBadge('snomed_source_badge_rad', 'database');
-        $('#sel_loinc_rad').val(null).trigger('change');
-        if(code){var o=new Option(code+' - '+disp,code,true,true);$('#sel_loinc_rad').append(o).trigger('change');$('#m_loinc_display_rad').val(disp);}else $('#m_loinc_display_rad').val('');
-        $('#sel_snomed_rad').val(null).trigger('change');
-        if(sc){var o2=new Option(sc+' - '+sd,sc,true,true);$('#sel_snomed_rad').append(o2).trigger('change');$('#m_snomed_display_rad').val(sd);}else $('#m_snomed_display_rad').val('');
+        
+        $('#sel_loinc_rad').val(null).trigger('change'); $('#loinc_ext_link_rad').hide();
+        $('#m_loinc_display_rad').val('');
+        if (code) { 
+            var o=new Option(code+' - '+disp,code,true,true); 
+            $('#sel_loinc_rad').append(o).trigger('change'); 
+            $('#m_loinc_display_rad').val(disp); 
+            $('#loinc_ext_link_rad').attr('href', 'https://loinc.org/' + code).show();
+        } 
+        
+        $('#sel_snomed_rad').val(null).trigger('change'); $('#snomed_ext_link_rad').hide();
+        $('#m_snomed_display_rad').val('');
+        if (sc) { 
+            var o2=new Option(sc+' - '+sd,sc,true,true); 
+            $('#sel_snomed_rad').append(o2).trigger('change'); 
+            $('#m_snomed_display_rad').val(sd); 
+            $('#snomed_ext_link_rad').attr('href', 'https://browser.ihtsdotools.org/?perspective=full&conceptId1=' + sc).show();
+        } 
+        
         new bootstrap.Modal(document.getElementById('modalMappingRad')).show();
     });
 

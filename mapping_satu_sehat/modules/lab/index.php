@@ -115,7 +115,10 @@ check_module_access('satu_sehat_mapping_lab');
                     <div class="mb-3">
                         <label class="form-label fw-bold text-success">2. Spesimen/Sampel (SNOMED-CT)</label>
                         <select class="form-select" id="sel_snomed" name="snomed_code" style="width:100%" required></select>
-                        <div class="mt-1"><span id="snomed_source_badge" class="badge bg-secondary" style="font-size:.7rem;"><i class="fa fa-database me-1"></i>Sumber: Database Lokal</span></div>
+                        <div class="mt-1">
+                            <span id="snomed_source_badge" class="badge bg-secondary" style="font-size:.7rem;"><i class="fa fa-database me-1"></i>Sumber: Database Lokal</span>
+                            <a id="snomed_ext_link" href="#" target="_blank" class="badge bg-success text-white text-decoration-none ms-1" style="font-size:.7rem; display:none;"><i class="fa fa-external-link me-1"></i>SNOMED Browser</a>
+                        </div>
                         <input type="hidden" name="snomed_display" id="m_snomed_display">
                         <div class="form-text">Contoh: Serum, Plasma, Urine. System: <i>http://snomed.info/sct</i></div>
                     </div>
@@ -261,6 +264,35 @@ $(function() {
         $('#loinc_ext_link').hide();
     });
 
+    function formatSnomed(repo) {
+        if (repo.loading) return repo.text;
+        
+        let term = repo.display || repo.text || '';
+        let semanticTag = '';
+        let match = term.match(/\(([^)]+)\)$/);
+        if (match) {
+            semanticTag = match[1];
+            term = term.replace(/\([^)]+\)$/, '').trim();
+        }
+        
+        let badges = `<span class="badge bg-success me-1" style="opacity:0.9"><i class="fa fa-fingerprint"></i> SNOMED-CT</span>`;
+        if (semanticTag) {
+            badges += `<span class="badge bg-secondary me-1"><i class="fa fa-tag"></i> ${semanticTag}</span>`;
+        }
+        
+        var $container = $(
+            "<div class='select2-result-repository clearfix'>" +
+              "<div class='select2-result-repository__title fw-bold mb-1'>" + repo.id + " - " + term + "</div>" +
+              "<div class='select2-result-repository__badges' style='font-size: 0.75rem;'>" + badges + "</div>" +
+            "</div>"
+        );
+        return $container;
+    }
+
+    function formatSnomedSelection(repo) {
+        return repo.text || repo.id;
+    }
+
     $('#sel_snomed').select2({
         theme: 'bootstrap-5', dropdownParent: $('#modalMapping'),
         placeholder: 'Cari Spesimen/Sampel (SNOMED-CT)...', minimumInputLength: 2,
@@ -277,18 +309,40 @@ $(function() {
                 };
             },
             error: function() { fhirSetBadge('snomed_source_badge', 'fallback'); }
-        }
-    }).on('select2:select', function(e) { $('#m_snomed_display').val(e.params.data.display); });
+        },
+        templateResult: formatSnomed,
+        templateSelection: formatSnomedSelection
+    }).on('select2:select', function(e) { 
+        $('#m_snomed_display').val(e.params.data.display); 
+        $('#snomed_ext_link').attr('href', 'https://browser.ihtsdotools.org/?perspective=full&conceptId1=' + e.params.data.id).show();
+    }).on('select2:clear', function(e) {
+        $('#snomed_ext_link').hide();
+    });
 
     $('#tableLab tbody').on('click', '.btn-map', function() {
         var id=$(this).data('id'), nama=$(this).data('nama'), loinc=$(this).data('loinc'), ld=$(this).data('loinc-display'), snomed=$(this).data('snomed'), sd=$(this).data('snomed-display');
         $('#m_id_template').val(id); $('#m_nama_pemeriksaan').text(nama); $('#m_nama_copy').text(nama);
         fhirSetBadge('loinc_source_badge', 'database');
         fhirSetBadge('snomed_source_badge', 'database');
-        $('#sel_loinc').val(null).trigger('change');
-        if (loinc) { var o=new Option(loinc+' - '+ld,loinc,true,true); $('#sel_loinc').append(o).trigger('change'); $('#m_loinc_display').val(ld); } else $('#m_loinc_display').val('');
-        $('#sel_snomed').val(null).trigger('change');
-        if (snomed) { var o2=new Option(snomed+' - '+sd,snomed,true,true); $('#sel_snomed').append(o2).trigger('change'); $('#m_snomed_display').val(sd); } else $('#m_snomed_display').val('');
+        
+        $('#sel_loinc').val(null).trigger('change'); $('#loinc_ext_link').hide();
+        $('#m_loinc_display').val('');
+        if (loinc) { 
+            var o=new Option(loinc+' - '+ld,loinc,true,true); 
+            $('#sel_loinc').append(o).trigger('change'); 
+            $('#m_loinc_display').val(ld); 
+            $('#loinc_ext_link').attr('href', 'https://loinc.org/' + loinc).show();
+        } 
+        
+        $('#sel_snomed').val(null).trigger('change'); $('#snomed_ext_link').hide();
+        $('#m_snomed_display').val('');
+        if (snomed) { 
+            var o2=new Option(snomed+' - '+sd,snomed,true,true); 
+            $('#sel_snomed').append(o2).trigger('change'); 
+            $('#m_snomed_display').val(sd); 
+            $('#snomed_ext_link').attr('href', 'https://browser.ihtsdotools.org/?perspective=full&conceptId1=' + snomed).show();
+        } 
+        
         new bootstrap.Modal(document.getElementById('modalMapping')).show();
     });
 
