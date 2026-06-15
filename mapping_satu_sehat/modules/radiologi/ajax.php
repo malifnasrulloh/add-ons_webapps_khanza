@@ -186,7 +186,8 @@ try {
         
         $isFallback = false;
         if ($searchMode === 'api') {
-            $apiData = fhir_search_snomed($q);
+            // ECL <<123037004 membatasi pencarian hanya pada descendant dari "Body structure"
+            $apiData = fhir_search_snomed($q, '<<123037004');
             if ($apiData['status'] === 'success') {
                 echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
                 exit;
@@ -254,6 +255,12 @@ try {
             ':kd'=>$kd_jenis_prw, ':lc'=>$loinc_code, ':ld'=>$loinc_display, ':sc'=>$snomed_code, ':sd'=>$snomed_display,
             ':lc2'=>$loinc_code, ':ld2'=>$loinc_display, ':sc2'=>$snomed_code, ':sd2'=>$snomed_display
         ]);
+
+        // Auto-cache SNOMED to local database for future searches
+        if (!empty($snomed_code)) {
+            $stmtCache = $pdo->prepare("INSERT IGNORE INTO satu_sehat_ref_snomed (conceptId, term) VALUES (:id, :term)");
+            $stmtCache->execute([':id' => $snomed_code, ':term' => $snomed_display]);
+        }
 
         echo json_encode(['status' => 'success', 'message' => 'Mapping radiologi berhasil disimpan.']);
         exit;

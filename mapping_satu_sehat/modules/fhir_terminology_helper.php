@@ -15,25 +15,31 @@ function fhir_get_credential() {
 }
 
 /**
- * Mencari kode SNOMED CT menggunakan HL7 Public Terminology Server (tx.fhir.org).
- * Server ini tidak memerlukan autentikasi dan stabil sebagai public endpoint.
- * CATATAN: snowstorm.snomedtools.org sering timeout dari jaringan lokal,
- *          sehingga diganti ke tx.fhir.org yang terbukti merespons.
+ * Mencari kode SNOMED CT menggunakan SNOMED International Public Training API.
+ * Server ini sangat cepat, stabil, dan tidak memerlukan autentikasi.
  *
  * @param string $keyword
+ * @param string|null $ecl Constraint SNOMED Expression Constraint Language (opsional)
  * @return array Array results untuk select2
  */
-function fhir_search_snomed($keyword) {
-    // HL7 FHIR Public Terminology Server — mendukung SNOMED CT tanpa autentikasi
-    $url = 'https://tx.fhir.org/r4/ValueSet/$expand'
-         . '?url=' . urlencode('http://snomed.info/sct?fhir_vs')
+function fhir_search_snomed($keyword, $ecl = null) {
+    // Gunakan Snowstorm Training API (Public, No Auth)
+    $url = 'https://snowstorm-training.snomedtools.org/fhir/ValueSet/$expand';
+    
+    // Jika ada ECL, gabungkan ke parameter url. Jika tidak, gunakan base fhir_vs
+    $vs_url = 'http://snomed.info/sct?fhir_vs';
+    if ($ecl !== null) {
+        $vs_url .= '=ecl/' . urlencode($ecl);
+    }
+    
+    $url .= '?url=' . $vs_url
          . '&filter=' . urlencode($keyword)
-         . '&count=25';
+         . '&count=50'; // Ambil hingga 50 untuk sinkronisasi dengan pagination lokal
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 12);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);   // compat localhost XAMPP
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Accept: application/json',
@@ -64,7 +70,7 @@ function fhir_search_snomed($keyword) {
         'status'  => ($http_code === 200 && count($results) > 0) ? 'success' : 'error',
         'source'  => 'api',
         'results' => $results,
-        'debug'   => $curl_err ?: null   // kirim error cURL untuk debugging jika perlu
+        'debug'   => $curl_err ?: null
     ];
 }
 

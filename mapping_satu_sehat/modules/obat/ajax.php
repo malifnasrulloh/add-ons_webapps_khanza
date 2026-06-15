@@ -322,6 +322,12 @@ try {
             $den_code, $den_system
         ]);
 
+        // Auto-cache KFA to local database for future searches
+        if (!empty($kfa_code)) {
+            $stmtCache = $pdo->prepare("INSERT IGNORE INTO satu_sehat_ref_kfa (kfa_code, display_name) VALUES (:id, :term)");
+            $stmtCache->execute([':id' => $kfa_code, ':term' => $kfa_display]);
+        }
+
         echo json_encode(['status' => 'success', 'message' => 'Mapping berhasil disimpan!']);
         exit;
     }

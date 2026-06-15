@@ -200,7 +200,8 @@ try {
         
         $isFallback = false;
         if ($searchMode === 'api') {
-            $apiData = fhir_search_snomed($q);
+            // ECL <<123038009 membatasi pencarian hanya pada descendant dari "Specimen"
+            $apiData = fhir_search_snomed($q, '<<123038009');
             if ($apiData['status'] === 'success') {
                 echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
                 exit;
@@ -258,6 +259,12 @@ try {
                 VALUES (:id, :lc, 'http://loinc.org', :ld, :sc, 'http://snomed.info/sct', :sd)
                 ON DUPLICATE KEY UPDATE code=:lc2, display=:ld2, sampel_code=:sc2, sampel_display=:sd2");
         $stmt->execute([':id'=>$id_template,':lc'=>$loinc_code,':ld'=>$loinc_display,':sc'=>$snomed_code,':sd'=>$snomed_display,':lc2'=>$loinc_code,':ld2'=>$loinc_display,':sc2'=>$snomed_code,':sd2'=>$snomed_display]);
+
+        // Auto-cache SNOMED to local database for future searches
+        if (!empty($snomed_code)) {
+            $stmtCache = $pdo->prepare("INSERT IGNORE INTO satu_sehat_ref_snomed (conceptId, term) VALUES (:id, :term)");
+            $stmtCache->execute([':id' => $snomed_code, ':term' => $snomed_display]);
+        }
 
         $pesan = "Mapping berhasil disimpan.";
 

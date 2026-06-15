@@ -248,6 +248,12 @@ exit;
             ':dqc2'=>$dose_qty_code, ':dqs2'=>$dose_qty_system, ':dqu2'=>$dose_qty_unit
         ]);
 
+        // Auto-cache KFA to local database for future searches
+        if (!empty($vaksin_code)) {
+            $stmtCache = $pdo->prepare("INSERT IGNORE INTO satu_sehat_ref_kfa (kfa_code, display_name) VALUES (:id, :term)");
+            $stmtCache->execute([':id' => $vaksin_code, ':term' => $vaksin_display]);
+        }
+
         echo json_encode(['status' => 'success', 'message' => 'Mapping vaksin berhasil disimpan.']);
         exit;
     }
