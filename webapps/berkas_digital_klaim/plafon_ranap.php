@@ -151,11 +151,13 @@ if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
                                     reg_periksa.biaya_reg,
                                     reg_periksa.kd_pj,
                                     perkiraan_biaya_ranap.kd_penyakit, 
+                                    penyakit.nm_penyakit,
                                     perkiraan_biaya_ranap.tarif AS tarif_INACBG,
                                     pegawai.nama as dpjp_nama
                                 FROM reg_periksa
                                 LEFT JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
                                 LEFT JOIN perkiraan_biaya_ranap ON reg_periksa.no_rawat = perkiraan_biaya_ranap.no_rawat
+                                LEFT JOIN penyakit ON perkiraan_biaya_ranap.kd_penyakit = penyakit.kd_penyakit
                                 LEFT JOIN dpjp_ranap ON reg_periksa.no_rawat = dpjp_ranap.no_rawat
                                 LEFT JOIN pegawai ON dpjp_ranap.kd_dokter = pegawai.nik
                                 INNER JOIN kamar_inap ON reg_periksa.no_rawat = kamar_inap.no_rawat
@@ -325,8 +327,11 @@ if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
                                     <td><?= $row['nm_pasien'] ?></td>
                                     <td>
                                         <div class="input-group input-group-sm">
-                                            <input type="text" class="form-control form-control-sm" placeholder="Kode ICD/Grouper" 
-                                                   id="kode_<?= $id_select ?>" value="<?= htmlspecialchars($row['kd_penyakit']) ?>">
+                                            <select class="form-select form-select-sm select2-icd" id="kode_<?= $id_select ?>">
+                                                <?php if(!empty($row['kd_penyakit'])): ?>
+                                                    <option value="<?= htmlspecialchars($row['kd_penyakit']) ?>" selected><?= htmlspecialchars($row['kd_penyakit']) ?> - <?= htmlspecialchars($row['nm_penyakit']) ?></option>
+                                                <?php endif; ?>
+                                            </select>
                                             <input type="number" class="form-control form-control-sm" placeholder="Nominal" 
                                                    id="tarif_<?= $id_select ?>" value="<?= $row['tarif_INACBG'] ?>">
                                             <button class="btn btn-primary btn-sm btn-save" data-id="<?= $id_select ?>" data-rawat="<?= $row['no_rawat'] ?>">
@@ -398,6 +403,34 @@ if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
             pageLength: 10,
             lengthMenu: [ [10, 50, 100, -1], ['10', '50', '100', 'Semua'] ]
         });
+
+        function initSelect2() {
+            $('.select2-icd').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Pilih ICD-10...',
+                minimumInputLength: 2,
+                allowClear: true,
+                ajax: {
+                    url: 'api/search_penyakit.php',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return { term: params.term, page: params.page || 1 };
+                    },
+                    processResults: function (data, params) {
+                        params.page = params.page || 1;
+                        return {
+                            results: data.results,
+                            pagination: { more: data.pagination.more }
+                        };
+                    },
+                    cache: true
+                }
+            });
+        }
+
+        initSelect2();
+        tablePlafon.on('draw', function() { initSelect2(); });
 
         // Handle Save Button
         $(document).on('click', '.btn-save', function() {
