@@ -1,14 +1,22 @@
 <?php
 
-$host = '192.168.x.x';
+$host = 'localhost';
 $db   = 'sik';
 $user = 'root';
 $pass = '';
 $charset = 'utf8mb4';
 
-// Kemkes RS Online V3 Credentials
-$kemkes_id = "";  //kode fasyankes kemenkes gan
-$kemkes_pass = "";  //masuk ke rs online, lalu set di menu setting aplikasi
+// Parameter setting utama (format JSON) — dapat diedit oleh super admin via dashboard
+$siranap_settings = '{
+    "kemkes_id": "3213040",
+    "kemkes_pass": "RSUkarina_2020",
+    "force_sync_interval_seconds": 3600
+}';
+
+// Turunkan variabel operasional dari JSON (tidak ada hardcode di luar sini)
+$_cfg = json_decode($siranap_settings, true);
+$kemkes_id   = $_cfg['kemkes_id']   ?? '';
+$kemkes_pass = $_cfg['kemkes_pass'] ?? '';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
 $options = [

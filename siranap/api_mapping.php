@@ -18,6 +18,27 @@ if ($action === 'get_setting') {
     exit;
 }
 
+if ($action === 'get_app_settings') {
+    // Public read: returns current app settings from config.php JSON block
+    $configPath = __DIR__ . '/config.php';
+    $configContent = file_get_contents($configPath);
+    // Extract JSON block from $siranap_settings = '{ ... }'
+    if (preg_match("/\\\$siranap_settings\\s*=\\s*'({.*?})';/s", $configContent, $m)) {
+        $parsed = json_decode($m[1], true);
+        if ($parsed !== null) {
+            // Never expose kemkes_pass in plaintext to the client — redact it
+            $safe = $parsed;
+            $safe['kemkes_pass'] = str_repeat('*', strlen($parsed['kemkes_pass'] ?? ''));
+            echo json_encode(['status' => 'success', 'data' => $safe]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Gagal parse settings JSON']);
+        }
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Blok settings tidak ditemukan di config.php']);
+    }
+    exit;
+}
+
 if ($action === 'login') {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
@@ -55,6 +76,62 @@ if ($action === 'logout') {
 if (!isset($_SESSION['siranap_admin'])) {
     http_response_code(401);
     echo json_encode(['status' => 'error', 'message' => 'Unauthorized. Silakan login terlebih dahulu.']);
+    exit;
+}
+
+if ($action === 'get_ref_kemenkes') {
+    if (!$kemkes_id || !$kemkes_pass) {
+        echo json_encode(['status' => 'error', 'message' => 'Kredensial Kemkes belum diatur di config.php']);
+        exit;
+    }
+    
+    $url = "https://sirs.kemkes.go.id/fo/index.php/Referensi/tempat_tidur";
+    $dt = new DateTime(null, new DateTimeZone("UTC"));
+    $timestamp = $dt->getTimestamp();
+    
+    $headers = [
+        "X-rs-id: " . $kemkes_id,
+        "X-Timestamp: " . $timestamp,
+        "X-pass: " . $kemkes_pass,
+        "Content-type: application/json"
+    ];
+    
+    $curl = curl_init();
+    curl_setopt($curl, CURLOPT_URL, $url);
+    curl_setopt($curl, CURLOPT_HEADER, false);
+    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "GET");
+    curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($curl, CURLOPT_TIMEOUT, 15);
+    
+    $response = curl_exec($curl);
+    $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($curl);
+    curl_close($curl);
+    
+    if ($curl_error) {
+        echo json_encode(['status' => 'error', 'message' => 'CURL Error: ' . $curl_error]);
+        exit;
+    }
+    
+    $dataDecoded = json_decode($response, true);
+    if ($dataDecoded === null) {
+        echo json_encode(['status' => 'error', 'message' => 'Gagal parse JSON dari Kemenkes. Raw: ' . substr($response, 0, 200)]);
+        exit;
+    }
+    
+    if (isset($dataDecoded['tempat_tidur'][0]['message'])) {
+        $inner = json_decode($dataDecoded['tempat_tidur'][0]['message'], true);
+        if (isset($inner['status']) && $inner['status'] === 'false') {
+            echo json_encode(['status' => 'error', 'message' => 'Kemenkes API: ' . ($inner['response'] ?? 'Gagal Autentikasi')]);
+            exit;
+        }
+    }
+    
+    echo json_encode(['status' => 'success', 'data' => $dataDecoded['tempat_tidur'] ?? []]);
     exit;
 }
 
@@ -123,6 +200,61 @@ if ($action === 'delete') {
     exit;
 }
 
+if ($action === 'save_app_settings') {
+    $kemkes_id_new  = trim($_POST['kemkes_id']  ?? '');
+    $kemkes_pass_new = trim($_POST['kemkes_pass'] ?? '');
+    $interval_new   = (int)($_POST['force_sync_interval_seconds'] ?? 3600);
+
+    if (!$kemkes_id_new) {
+        echo json_encode(['status' => 'error', 'message' => 'Kemkes ID tidak boleh kosong.']);
+        exit;
+    }
+    if ($interval_new < 60) {
+        echo json_encode(['status' => 'error', 'message' => 'Interval minimal 60 detik.']);
+        exit;
+    }
+
+    $configPath    = __DIR__ . '/config.php';
+    $configContent = file_get_contents($configPath);
+
+    // Read existing JSON block from config.php
+    if (!preg_match("/\\\$siranap_settings\\s*=\\s*'({.*?})';/s", $configContent, $m)) {
+        echo json_encode(['status' => 'error', 'message' => 'Blok settings tidak ditemukan di config.php']);
+        exit;
+    }
+    $existing = json_decode($m[1], true) ?? [];
+
+    // Only update kemkes_pass if a real value was sent (not masked ***)
+    $existing['kemkes_id']  = $kemkes_id_new;
+    if ($kemkes_pass_new !== '' && !preg_match('/^\*+$/', $kemkes_pass_new)) {
+        $existing['kemkes_pass'] = $kemkes_pass_new;
+    }
+    $existing['force_sync_interval_seconds'] = $interval_new;
+
+    $newJson = json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    // Replace single quotes wrapping with safe escaped content
+    $newBlock = "\$siranap_settings = '" . str_replace("'", "\\'", $newJson) . "';";
+
+    $newConfigContent = preg_replace(
+        "/\\\$siranap_settings\\s*=\\s*'.*?';/s",
+        $newBlock,
+        $configContent
+    );
+
+    if ($newConfigContent === null || $newConfigContent === $configContent) {
+        echo json_encode(['status' => 'error', 'message' => 'Gagal menulis ulang config.php (regex mismatch).']);
+        exit;
+    }
+
+    if (file_put_contents($configPath, $newConfigContent) === false) {
+        echo json_encode(['status' => 'error', 'message' => 'Tidak dapat menyimpan config.php. Periksa izin file.']);
+        exit;
+    }
+
+    echo json_encode(['status' => 'success', 'message' => 'Pengaturan berhasil disimpan.']);
+    exit;
+}
+
 if ($action === 'setup_db') {
     try {
         $messages = [];
@@ -136,7 +268,7 @@ if ($action === 'setup_db') {
             // Table doesn't exist -> Create it
             $createSql = "CREATE TABLE `sirsonline_ketersediaan_kamar` (
                 `id_tt_sirsonline` varchar(15) NOT NULL,
-                `nm_ruang_sirsonline` enum('VVIP','VIP','Kelas Utama','Kelas I','Kelas II','Kelas III','HCU','NICU','Isolasi','Perinatologi') NOT NULL DEFAULT 'Kelas I',
+                `nm_ruang_sirsonline` enum('VVIP','VIP','Kelas Utama','Kelas I','Kelas II','Kelas III','HCU','NICU','Isolasi','Perinatologi','ICU','PICU','RICU','ICCU','KRIS JKN') NOT NULL DEFAULT 'Kelas I',
                 `kd_bangsal` varchar(5) NOT NULL,
                 `covid` enum('0','1') NOT NULL DEFAULT '0',
                 PRIMARY KEY (`id_tt_sirsonline`, `kd_bangsal`, `nm_ruang_sirsonline`),
@@ -160,7 +292,7 @@ if ($action === 'setup_db') {
 
             $requiredCols = [
                 'id_tt_sirsonline' => "varchar(15) NOT NULL",
-                'nm_ruang_sirsonline' => "enum('VVIP','VIP','Kelas Utama','Kelas I','Kelas II','Kelas III','HCU','NICU','Isolasi','Perinatologi') NOT NULL DEFAULT 'Kelas I'",
+                'nm_ruang_sirsonline' => "enum('VVIP','VIP','Kelas Utama','Kelas I','Kelas II','Kelas III','HCU','NICU','Isolasi','Perinatologi','ICU','PICU','RICU','ICCU','KRIS JKN') NOT NULL DEFAULT 'Kelas I'",
                 'kd_bangsal' => "varchar(5) NOT NULL",
                 'covid' => "enum('0','1') NOT NULL DEFAULT '0'"
             ];
@@ -175,6 +307,16 @@ if ($action === 'setup_db') {
                         'column' => $colName,
                         'status' => 'success',
                         'text' => "Kolom `{$colName}` ditambahkan ke tabel `{$tableName}`."
+                    ];
+                } else if ($colName === 'nm_ruang_sirsonline') {
+                    // Always alter nm_ruang_sirsonline to update enum values
+                    $pdo->exec("ALTER TABLE `{$tableName}` MODIFY COLUMN `{$colName}` {$colDef}");
+                    $messages[] = [
+                        'type' => 'alter_modify',
+                        'table' => $tableName,
+                        'column' => $colName,
+                        'status' => 'success',
+                        'text' => "Enum kolom `{$colName}` diperbarui."
                     ];
                 }
             }

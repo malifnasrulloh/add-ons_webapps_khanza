@@ -11,6 +11,24 @@ $logs = [];
 $changesCount = 0;
 $getDebug = null;
 
+// Parse customizable settings and check interval
+$settings = json_decode($siranap_settings ?? '{}', true);
+$syncInterval = (int)($settings['force_sync_interval_seconds'] ?? 3600);
+$stateFile = 'last_sync_state.json';
+$lastFullSync = 0;
+
+if (file_exists($stateFile)) {
+    $stateData = json_decode(file_get_contents($stateFile), true);
+    $lastFullSync = (int)($stateData['last_full_sync_timestamp'] ?? 0);
+}
+
+$timeElapsed = time() - $lastFullSync;
+$intervalElapsed = ($timeElapsed >= $syncInterval);
+
+if ($intervalElapsed) {
+    $force = true; // Auto-force full sync if interval elapsed
+}
+
 try {
     // 1. Fetch current status of beds from Kemenkes (source of truth)
     $dt = new DateTime(null, new DateTimeZone("UTC"));
@@ -98,9 +116,9 @@ try {
     $currentData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $currentStateKeys = [];
-    $toSync = [];
+    $hasChanges = false;
 
-    // 3. Identify additions (POST) and updates (PUT)
+    // 3. Compare local and Kemenkes data to check for any changes
     foreach ($currentData as $row) {
         $id_tt = trim($row['id_tt']);
         $ruang = trim($row['ruang']);
@@ -111,48 +129,73 @@ try {
         $jumlah = (int)$row['jumlah'];
         $terpakai = (int)($row['terpakai'] ?? 0);
         
-        // Calculate covid split
-        $terpakai_suspek = "0";
-        $terpakai_konfirmasi = "0";
-        if ($covid === '1') {
-            $terpakai_konfirmasi = (string)$terpakai;
-        }
-        
-        $data = [
-            'ruang' => $ruang,
-            'jumlah_ruang' => "1",
-            'jumlah' => (string)$jumlah,
-            'terpakai' => (string)$terpakai,
-            'terpakai_suspek' => $terpakai_suspek,
-            'terpakai_konfirmasi' => $terpakai_konfirmasi,
-            'antrian' => "0",
-            'prepare' => "0",
-            'prepare_plan' => "0",
-            'covid' => (int)$covid,
-            'terpakai_dbd' => "0",
-            'terpakai_dbd_anak' => "0",
-            'jumlah_dbd' => "0"
-        ];
-
         if (!isset($kemenkesState[$key])) {
-            // New entry -> POST (needs id_tt)
-            $data['id_tt'] = $id_tt;
-            $toSync[] = [
-                'method' => 'POST',
-                'data' => $data,
-                'key' => $key,
-                'label' => "$id_tt ($ruang)"
-            ];
+            $hasChanges = true;
         } else {
-            // Existing entry -> PUT (needs id_t_tt instead of id_tt)
-            $id_t_tt = $kemenkesState[$key]['id_t_tt'];
-            $data['id_t_tt'] = $id_t_tt;
-            
             $kemenkesJumlah = (int)$kemenkesState[$key]['jumlah'];
             $kemenkesTerpakai = (int)$kemenkesState[$key]['terpakai'];
+            if ($kemenkesJumlah !== $jumlah || $kemenkesTerpakai !== $terpakai) {
+                $hasChanges = true;
+            }
+        }
+    }
+
+    // Check for local deletions
+    foreach ($kemenkesState as $key => $kState) {
+        if (!in_array($key, $currentStateKeys)) {
+            $hasChanges = true;
+        }
+    }
+
+    $toSync = [];
+
+    // 4. If any change is detected OR if interval/manual force is active -> full sync (Sapu Bersih)
+    if ($hasChanges || $force) {
+        foreach ($currentData as $row) {
+            $id_tt = trim($row['id_tt']);
+            $ruang = trim($row['ruang']);
+            $covid = trim($row['covid']);
+            $key = $id_tt . '_' . $ruang . '_' . $covid;
             
-            // Sync if counts changed OR if we are forcing sync (sapu bersih)
-            if ($force || $kemenkesJumlah !== $jumlah || $kemenkesTerpakai !== $terpakai) {
+            $jumlah = (int)$row['jumlah'];
+            $terpakai = (int)($row['terpakai'] ?? 0);
+            
+            // Calculate covid split
+            $terpakai_suspek = "0";
+            $terpakai_konfirmasi = "0";
+            if ($covid === '1') {
+                $terpakai_konfirmasi = (string)$terpakai;
+            }
+            
+            $data = [
+                'ruang' => $ruang,
+                'jumlah_ruang' => "1",
+                'jumlah' => (string)$jumlah,
+                'terpakai' => (string)$terpakai,
+                'terpakai_suspek' => $terpakai_suspek,
+                'terpakai_konfirmasi' => $terpakai_konfirmasi,
+                'antrian' => "0",
+                'prepare' => "0",
+                'prepare_plan' => "0",
+                'covid' => (int)$covid,
+                'terpakai_dbd' => "0",
+                'terpakai_dbd_anak' => "0",
+                'jumlah_dbd' => "0"
+            ];
+
+            if (!isset($kemenkesState[$key])) {
+                // New entry -> POST
+                $data['id_tt'] = $id_tt;
+                $toSync[] = [
+                    'method' => 'POST',
+                    'data' => $data,
+                    'key' => $key,
+                    'label' => "$id_tt ($ruang)"
+                ];
+            } else {
+                // Existing entry -> PUT
+                $id_t_tt = $kemenkesState[$key]['id_t_tt'];
+                $data['id_t_tt'] = $id_t_tt;
                 $toSync[] = [
                     'method' => 'PUT',
                     'data' => $data,
@@ -161,22 +204,22 @@ try {
                 ];
             }
         }
-    }
 
-    // 4. Identify Removals (DELETE)
-    foreach ($kemenkesState as $key => $kState) {
-        if (!in_array($key, $currentStateKeys)) {
-            $id_t_tt = $kState['id_t_tt'];
-            $parts = explode('_', $key);
-            $id_tt = $parts[0] ?? '';
-            $ruang = $parts[1] ?? '';
-            
-            $toSync[] = [
-                'method' => 'DELETE',
-                'data' => ['id_t_tt' => $id_t_tt],
-                'key' => $key,
-                'label' => "$id_tt ($ruang) [ID: $id_t_tt]"
-            ];
+        // Add deletions
+        foreach ($kemenkesState as $key => $kState) {
+            if (!in_array($key, $currentStateKeys)) {
+                $id_t_tt = $kState['id_t_tt'];
+                $parts = explode('_', $key);
+                $id_tt = $parts[0] ?? '';
+                $ruang = $parts[1] ?? '';
+                
+                $toSync[] = [
+                    'method' => 'DELETE',
+                    'data' => ['id_t_tt' => $id_t_tt],
+                    'key' => $key,
+                    'label' => "$id_tt ($ruang) [ID: $id_t_tt]"
+                ];
+            }
         }
     }
 
@@ -236,6 +279,14 @@ try {
             'curl_error' => $curl_error,
             'status' => $isSuccess ? 'SUCCESS' : 'FAILED'
         ];
+    }
+
+    // If changes occurred OR if we performed a full sync due to interval/force
+    if ($changesCount > 0 || ($force && count($toSync) === 0)) {
+        $stateData = [
+            'last_full_sync_timestamp' => time()
+        ];
+        file_put_contents($stateFile, json_encode($stateData, JSON_PRETTY_PRINT));
     }
 
     echo json_encode([

