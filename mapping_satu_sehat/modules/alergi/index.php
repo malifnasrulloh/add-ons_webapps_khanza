@@ -165,6 +165,42 @@ if (isset($_SESSION['alergi_mapping_data']) && !empty($_SESSION['alergi_mapping_
     </div>
 </div>
 
+<!-- Footer copyright (Anti-Tampering — JANGAN DIHAPUS) -->
+<div class="footer-credit text-center mt-4 mb-2" id="footer-credit-block" onclick="new bootstrap.Modal(document.getElementById('modalSaweria')).show();" style="cursor: pointer; font-size: 0.72rem; color: #94a3b8;">
+    &copy; <a href="https://saweria.co/ichsanleonhart" target="_blank" onclick="event.stopPropagation();" style="color: #6d28d9; text-decoration: none; font-weight: 600;">Ichsan Leonhart</a> &nbsp;·&nbsp;
+    <a href="https://wa.me/6285726123777" target="_blank" onclick="event.stopPropagation();" style="color: #6d28d9; text-decoration: none; font-weight: 600;">6285726123777</a> &nbsp;·&nbsp;
+    <a href="https://t.me/IchsanLeonhart" target="_blank" onclick="event.stopPropagation();" style="color: #6d28d9; text-decoration: none; font-weight: 600;">@IchsanLeonhart</a> &nbsp;·&nbsp;
+    <a href="https://raw.githubusercontent.com/ichsanleonhart/add-ons_webapps_khanza/main/qris-ichsan.png" target="_blank" onclick="event.stopPropagation();" style="color: #6d28d9; text-decoration: none; font-weight: 600;">QRIS Donasi</a>
+    — <a href="https://saweria.co/ichsanleonhart" target="_blank" onclick="event.stopPropagation();" style="color: #6d28d9; text-decoration: none; font-weight: 600;">saweria.co/ichsanleonhart</a>
+</div>
+
+<!-- Modal Saweria (Uneg-uneg Mengemis) -->
+<div class="modal fade" id="modalSaweria" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+            <div class="modal-header border-0 pb-0">
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center pt-0 pb-4 px-4">
+                <div class="mb-3">
+                    <img src="https://raw.githubusercontent.com/ichsanleonhart/add-ons_webapps_khanza/main/qris-ichsan.png" class="img-fluid rounded-3 shadow-sm" style="max-width: 280px;" alt="QRIS Donasi">
+                </div>
+                <h5 class="fw-bold text-primary mb-3">Apresiasi & Dukungan Donasi</h5>
+                <p class="text-muted small px-2 mb-4" style="line-height: 1.6;">
+                    Halo rekan-rekan IT dan Super Admin. Terima kasih telah menggunakan aplikasi pemetaan Satu Sehat ini.<br><br>
+                    Jika aplikasi ini membantu mempermudah pekerjaan Anda, mohon bantuannya untuk sedikit memberikan apresiasi / "traktiran kopi" agar saya tetap semangat melakukan maintenance dan update fitur lainnya. Berapapun dukungan Anda sangat berarti bagi kelangsungan pengembangan aplikasi ini.<br><br>
+                    <strong>Terima kasih banyak atas dukungannya! 🙏</strong>
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="https://saweria.co/ichsanleonhart" target="_blank" class="btn btn-primary py-2 fw-bold" style="background:linear-gradient(135deg, #4f46e5, #7c3aed); border:none;">
+                        <i class="fa-solid fa-heart me-2"></i> Dukung via Saweria.co
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
@@ -320,6 +356,17 @@ $(document).ready(function() {
             Swal.fire('Error', 'Gagal menghubungi server.', 'error');
         });
     });
+
+    // Anti-Tampering
+    setInterval(function() {
+        var el = document.getElementById('footer-credit-block');
+        if (!el) { document.body.innerHTML = ''; return; }
+        var html = el.innerHTML;
+        var cs = window.getComputedStyle(el);
+        var checks = [atob('SWNoc2FuIExlb25oYXJ0'),atob('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA=='),atob('NjI4NTcyNjEyMzc3Nw=='),atob('QEljaHNhbkxlb25oYXJ0'),atob('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc=')];
+        if (cs.display==='none'||cs.visibility==='hidden'||cs.opacity==='0') { document.body.innerHTML=''; return; }
+        for(var i=0;i<checks.length;i++) { if(html.indexOf(checks[i])===-1) { document.body.innerHTML=''; return; } }
+    }, 3000);
 });
 </script>
 </body>

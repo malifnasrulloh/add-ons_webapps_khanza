@@ -201,7 +201,7 @@ try {
         $isFallback = false;
         if ($searchMode === 'api') {
             // ECL <<123038009 membatasi pencarian hanya pada descendant dari "Specimen"
-            $apiData = fhir_search_snomed($q, '<<123038009');
+            $apiData = fhir_search_snomed($q);
             if ($apiData['status'] === 'success') {
                 echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
                 exit;

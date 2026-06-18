@@ -187,7 +187,7 @@ try {
         $isFallback = false;
         if ($searchMode === 'api') {
             // ECL <<123037004 membatasi pencarian hanya pada descendant dari "Body structure"
-            $apiData = fhir_search_snomed($q, '<<123037004');
+            $apiData = fhir_search_snomed($q);
             if ($apiData['status'] === 'success') {
                 echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
                 exit;

@@ -123,10 +123,10 @@ try {
         $q = isset($_GET['term']) ? trim($_GET['term']) : '';
         require_once dirname(__DIR__) . '/fhir_terminology_helper.php';
         
-        // ECL untuk Alergi: (Substance) ATAU (Pharmaceutical / biologic product) ATAU (Propensity to adverse reaction)
-        $ecl = '<<105590001 OR <<373873005 OR <<420134006';
+        // // ECL untuk Alergi: (Substance) ATAU (Pharmaceutical / biologic product) ATAU (Propensity to adverse reaction)
+        // $ecl = '<<105590001 OR <<373873005 OR <<420134006';
         
-        $apiData = fhir_search_snomed($q, $ecl);
+        $apiData = fhir_search_snomed($q);
         
         if ($apiData['status'] === 'success') {
             echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
