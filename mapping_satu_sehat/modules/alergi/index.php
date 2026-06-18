@@ -2,13 +2,15 @@
 /**
  * modules/alergi/index.php — UI Mapping Alergi (Session-based)
  */
-require_once '../../conf.php';
-require_once '../../auth_check.php';
+require_once __DIR__ . '/../../conf.php';
+require_once __DIR__ . '/../../auth_check.php';
 require_login();
 
 // Cek apakah ada data di session
-session_start();
-$has_data = isset($_SESSION['alergi_mapping_data']) && !empty($_SESSION['alergi_mapping_data']);
+$has_data = false;
+if (isset($_SESSION['alergi_mapping_data']) && !empty($_SESSION['alergi_mapping_data'])) {
+    $has_data = true;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -170,7 +172,7 @@ $has_data = isset($_SESSION['alergi_mapping_data']) && !empty($_SESSION['alergi_
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-const CSRF_TOKEN = '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "", ENT_QUOTES, "UTF-8") ?>';
+const CSRF_TOKEN = '<?= isset($_SESSION["csrf_token"]) ? htmlspecialchars($_SESSION["csrf_token"], ENT_QUOTES, "UTF-8") : "" ?>';
 let table;
 
 function reloadTable() {

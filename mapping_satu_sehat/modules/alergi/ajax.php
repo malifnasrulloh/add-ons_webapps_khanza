@@ -3,12 +3,12 @@
  * modules/alergi/ajax.php — Backend AJAX Modul Mapping Alergi (Stateless/Session-based)
  */
 error_reporting(0); ini_set('display_errors', 0);
-require_once '../../conf.php';
-require_once '../../auth_check.php';
+require_once __DIR__ . '/../../conf.php';
+require_once __DIR__ . '/../../auth_check.php';
 require_login(); // Menggunakan require_login karena modul ini tidak memiliki tabel tersendiri
 header('Content-Type: application/json');
 
-$action = $_GET['action'] ?? '';
+$action = isset($_GET['action']) ? $_GET['action'] : '';
 $session_key = 'alergi_mapping_data';
 
 // Helper function to safely read JSON and init session
@@ -146,9 +146,9 @@ try {
             throw new Exception("Index data tidak valid atau sesi kadaluarsa.");
         }
 
-        $_SESSION[$session_key][$index]['category'] = $_POST['category'] ?? '';
-        $_SESSION[$session_key][$index]['coding_code'] = $_POST['snomed_code'] ?? '';
-        $_SESSION[$session_key][$index]['coding_display'] = $_POST['snomed_display'] ?? '';
+        $_SESSION[$session_key][$index]['category'] = isset($_POST['category']) ? $_POST['category'] : '';
+        $_SESSION[$session_key][$index]['coding_code'] = isset($_POST['snomed_code']) ? $_POST['snomed_code'] : '';
+        $_SESSION[$session_key][$index]['coding_display'] = isset($_POST['snomed_display']) ? $_POST['snomed_display'] : '';
 
         echo json_encode(['status' => 'success', 'message' => 'Mapping berhasil diperbarui di memori (sesi).']);
         exit;
