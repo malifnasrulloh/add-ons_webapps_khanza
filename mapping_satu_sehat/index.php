@@ -66,6 +66,16 @@ $moduls = [
         'url'     => 'modules/vaksin/index.php',
         'badge'   => 'CVX',
     ],
+    [
+        'judul'   => 'Mapping Alergi',
+        'deskripsi' => 'Mapping data alergi ke format .iyem menggunakan kode SNOMED-CT Satu Sehat.',
+        'ikon'    => 'fa-allergies',
+        'gradien' => 'linear-gradient(135deg,#ca8a04,#eab308)',
+        'glow'    => 'rgba(202,138,4,0.35)',
+        'kolom'   => '', // No specific permission column required for stateless module right now
+        'url'     => 'modules/alergi/index.php',
+        'badge'   => 'SNOMED',
+    ],
 
 ];
 ?>
