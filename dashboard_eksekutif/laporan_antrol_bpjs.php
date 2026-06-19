@@ -93,19 +93,20 @@ $sql = "SELECT
     rmj.status AS `status_mjkn`,
     rmb.statuskirim AS `statuskirim_batal`,
     rmb.keterangan AS `ket_batal`,
-    (SELECT no_sep FROM bridging_sep WHERE no_rawat = rp.no_rawat LIMIT 1) AS `no_sep`,
+    bs.no_sep AS `no_sep`,
     CONCAT(rp.tgl_registrasi, ' ', rp.jam_reg) AS `Jam Registrasi`,		
     rmj.validasi AS `Jam Checkin`,		    
     COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '3' THEN rmjt.waktu END), '%H:%i:%s'), 'SEP tdk Bridging / telat checkin') AS `log TID_3`,
-    (SELECT CONCAT(pr.tgl_perawatan, ' ', pr.jam_rawat)
-     FROM pemeriksaan_ralan pr
-     INNER JOIN dokter d2 ON pr.nip = d2.kd_dokter
-     WHERE pr.no_rawat = rp.no_rawat
-     ORDER BY pr.tgl_perawatan, pr.jam_rawat
-     LIMIT 1) AS `TID 4 input CPPT`,
-     COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '4' THEN rmjt.waktu END), '%H:%i:%s'), 'tdk isi cppt') AS `log TID_4`,
+    COALESCE(
+        (SELECT CONCAT(pr.tgl_perawatan, ' ', pr.jam_rawat) FROM pemeriksaan_ralan pr WHERE pr.no_rawat = rp.no_rawat LIMIT 1),
+        (SELECT pmr.tanggal FROM penilaian_medis_ralan pmr WHERE pmr.no_rawat = rp.no_rawat LIMIT 1),
+        (SELECT CONCAT(rjd.tgl_perawatan, ' ', rjd.jam_rawat) FROM rawat_jl_dr rjd WHERE rjd.no_rawat = rp.no_rawat LIMIT 1),
+        (SELECT CONCAT(cp.tanggal, ' ', cp.jam) FROM catatan_perawatan cp WHERE cp.no_rawat = rp.no_rawat LIMIT 1)
+    ) AS `TID 4 input CPPT`,
+    COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '4' THEN rmjt.waktu END), '%H:%i:%s'), 'tdk isi cppt') AS `log TID_4`,
     mb.kembali AS `TID 5 set status SUDAH`,
     COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '5' THEN rmjt.waktu END), '%H:%i:%s'), 'tdk klik yes di cppt') AS `log TID_5`,
+    ro.no_resep,
     CONCAT(ro.tgl_perawatan, ' ', ro.jam) AS `TID 6 validasi resep`,
     COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '6' THEN rmjt.waktu END), '%H:%i:%s'), 'Apt tdk validasi') AS `log TID_6`,
     CONCAT(ro.tgl_penyerahan, ' ', ro.jam_penyerahan) AS `TID 7 penyerahan resep`,
@@ -115,7 +116,8 @@ LEFT JOIN penjab pj ON rp.kd_pj = pj.kd_pj
 LEFT JOIN pasien ps ON rp.no_rkm_medis = ps.no_rkm_medis
 LEFT JOIN dokter d ON rp.kd_dokter = d.kd_dokter
 LEFT JOIN poliklinik pl ON rp.kd_poli = pl.kd_poli
-LEFT JOIN maping_poli_bpjs mpb ON rp.kd_poli = mpb.kd_poli_rs
+INNER JOIN maping_poli_bpjs mpb ON rp.kd_poli = mpb.kd_poli_rs
+INNER JOIN maping_dokter_dpjpvclaim md ON rp.kd_dokter = md.kd_dokter
 LEFT JOIN (
     SELECT 
         kd_dokter, kd_poli, hari_kerja, 
@@ -139,6 +141,7 @@ LEFT JOIN referensi_mobilejkn_bpjs rmj ON rp.no_rawat = rmj.no_rawat
 LEFT JOIN mutasi_berkas mb ON rp.no_rawat = mb.no_rawat
 LEFT JOIN resep_obat ro ON rp.no_rawat = ro.no_rawat
 LEFT JOIN referensi_mobilejkn_bpjs_batal rmb ON rp.no_rawat = rmb.no_rawat_batal
+LEFT JOIN bridging_sep bs ON rp.no_rawat = bs.no_rawat
 WHERE rp.tgl_registrasi BETWEEN ? AND ?
     AND mpb.nm_poli_bpjs NOT LIKE '%INSTALASI GAWAT DARURAT%'
     AND pj.png_jawab LIKE '%BPJ%'
@@ -172,7 +175,7 @@ if ($stmt = $koneksi->prepare($sql)) {
             $t6 = (strpos($row['log TID_6'], ':') !== false);
             $t7 = (strpos($row['log TID_7'], ':') !== false);
             
-            $has_resep = (isset($row['TID 6 validasi resep']) && trim($row['TID 6 validasi resep']) !== '');
+            $has_resep = !empty($row['no_resep']);
             $is_complete = false;
 
             if (!$is_anomaly_batal) {
@@ -197,6 +200,20 @@ if ($stmt = $koneksi->prepare($sql)) {
                 } else {
                     $metrics['incomplete_journey']++;
                 }
+
+                $poli_name = $row['Poliklinik'] ?? 'Unknown';
+                if (!isset($poly_stats[$poli_name])) {
+                    $poly_stats[$poli_name] = ['total' => 0, 'complete' => 0];
+                }
+                $poly_stats[$poli_name]['total']++;
+                if ($is_complete) $poly_stats[$poli_name]['complete']++;
+
+                $tgl_reg = $row['tgl_registrasi'];
+                if (!isset($trend_stats[$tgl_reg])) {
+                    $trend_stats[$tgl_reg] = ['total' => 0, 'complete' => 0];
+                }
+                $trend_stats[$tgl_reg]['total']++;
+                if ($is_complete) $trend_stats[$tgl_reg]['complete']++;
             }
 
             // Eksekutif Table Badges
@@ -277,6 +294,18 @@ $pct4 = prc($metrics['t4_sent'], $metrics['total_encounter']);
 $pct5 = prc($metrics['t5_sent'], $metrics['total_encounter']);
 $pct6 = prc($metrics['t6_sent'], $metrics['total_resep']);
 $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
+
+// Sort poly_stats by completion rate ascending
+$poly_lowest = [];
+foreach ($poly_stats as $name => $stat) {
+    if ($stat['total'] > 5) { // Only consider polyclinics with > 5 patients for statistically relevant lowest rates
+         $poly_lowest[$name] = round(($stat['complete'] / $stat['total']) * 100, 1);
+    }
+}
+asort($poly_lowest);
+$poly_lowest = array_slice($poly_lowest, 0, 4, true);
+
+ksort($trend_stats);
 ?>
 
 <style>
@@ -391,6 +420,39 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
             <div class="flex-grow-1 position-relative" style="min-height: 250px;">
                 <canvas id="pipelineChart"></canvas>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- TREND & POLI ROW -->
+<div class="row mb-4 g-4">
+    <div class="col-lg-8">
+        <div class="glass-card p-3 h-100 d-flex flex-column">
+            <h6 class="text-muted fw-bold"><i class="fas fa-chart-line me-2 text-info"></i> Trend Harian Keparipurnaan</h6>
+            <div class="flex-grow-1 position-relative" style="min-height: 250px;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="glass-card p-3 h-100 d-flex flex-column">
+            <h6 class="text-muted fw-bold"><i class="fas fa-hospital-user me-2 text-danger"></i> Poliklinik Terendah</h6>
+            <p class="small text-muted mb-3">Tingkat paripurna terendah (Min 5 Px).</p>
+            <ul class="list-group list-group-flush flex-grow-1">
+                <?php
+                if (empty($poly_lowest)) {
+                    echo "<li class='list-group-item text-center text-muted'>Data belum memadai</li>";
+                } else {
+                    foreach ($poly_lowest as $poli => $rate) {
+                        $badgeClass = $rate < 90 ? 'bg-danger' : 'bg-warning text-dark';
+                        echo "<li class='list-group-item d-flex justify-content-between align-items-center'>
+                                <span class='small text-truncate' style='max-width:200px;'>{$poli}</span>
+                                <span class='badge {$badgeClass} rounded-pill'>{$rate}%</span>
+                              </li>";
+                    }
+                }
+                ?>
+            </ul>
         </div>
     </div>
 </div>
@@ -554,6 +616,36 @@ function switchChart(type) {
 $(document).ready(function() {
     renderBarChart();
     
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: <?php echo json_encode(array_keys($trend_stats)); ?>,
+            datasets: [{
+                label: 'Tingkat Paripurna (%)',
+                data: <?php 
+                    $trend_rates = [];
+                    foreach ($trend_stats as $stat) {
+                        $trend_rates[] = $stat['total'] > 0 ? round(($stat['complete'] / $stat['total']) * 100, 1) : 0;
+                    }
+                    echo json_encode($trend_rates); 
+                ?>,
+                borderColor: '#0dcaf0',
+                backgroundColor: 'rgba(13, 202, 240, 0.2)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { min: 0, max: 100 }
+            }
+        }
+    });
+
     const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
     new Chart(doughnutCtx, {
         type: 'doughnut',
