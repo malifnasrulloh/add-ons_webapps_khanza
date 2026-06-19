@@ -129,6 +129,12 @@
                         "is_active": true
                     },
                     {
+                        "url": "akuntansi_mutasi_kas.php",
+                        "title": "Mutasi Kas Internal",
+                        "icon": "fas fa-random",
+                        "is_active": true
+                    },
+                    {
                         "url": "akuntansi_keuangan.php",
                         "title": "Laporan Keuangan",
                         "icon": "fas fa-chart-pie",

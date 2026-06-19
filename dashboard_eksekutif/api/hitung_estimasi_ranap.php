@@ -252,10 +252,20 @@ try {
     $dpjp = '';
     $is_dpjp_fallback = false;
     try {
-        $stmt = $koneksi_pdo->prepare("SELECT d.nm_dokter FROM dpjp_ranap dr JOIN dokter d ON dr.kd_dokter = d.kd_dokter WHERE dr.no_rawat = :no_rawat LIMIT 1");
+        // First try: Get 1 DPJP (last ordered by kd_dokter DESC)
+        $stmt = $koneksi_pdo->prepare("SELECT d.nm_dokter FROM dpjp_ranap dr JOIN dokter d ON dr.kd_dokter = d.kd_dokter WHERE dr.no_rawat = :no_rawat ORDER BY dr.kd_dokter DESC LIMIT 1");
         $stmt->execute([':no_rawat' => $no_rawat]);
-        if ($rd = $stmt->fetch(PDO::FETCH_ASSOC)) $dpjp = $rd['nm_dokter'];
-        else $is_dpjp_fallback = true;
+        if ($rd = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $dpjp = $rd['nm_dokter'];
+        } else {
+            // Second try: Fallback to reg_periksa doctor
+            $is_dpjp_fallback = true;
+            $stmt = $koneksi_pdo->prepare("SELECT d.nm_dokter FROM reg_periksa rp JOIN dokter d ON rp.kd_dokter = d.kd_dokter WHERE rp.no_rawat = :no_rawat LIMIT 1");
+            $stmt->execute([':no_rawat' => $no_rawat]);
+            if ($rd = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $dpjp = $rd['nm_dokter'];
+            }
+        }
     } catch (PDOException $e) {}
 
     // H. Plafon

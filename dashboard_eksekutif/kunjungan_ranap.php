@@ -184,14 +184,23 @@ html.theme-glass-animated .skeleton-text {
                         columns: ':visible:not(:last-child)', // Jangan export kolom Aksi
                         format: {
                             body: function(data, row, column, node) {
-                                var str = (data === null || data === undefined) ? '' : String(data);
-
                                 // 1. KOLOM RUPIAH (Plafon, Estimasi, Selisih)
                                 if (column === 4 || column === 5 || column === 6) {
-                                     return str.replace(/[^\d,-]/g, '').replace(',', '.');
+                                     var cellText = node ? node.textContent.trim() : '';
+                                     if (!cellText || cellText.includes('Memuat') || cellText.includes('2026')) {
+                                         return 0;
+                                     }
+                                     
+                                     // Tentukan apakah nilainya negatif/over (ditandai dengan parenthese/minus/over)
+                                     var isNegative = cellText.includes('(') || cellText.includes('-') || cellText.toLowerCase().includes('over');
+                                     var digits = cellText.replace(/\D/g, '');
+                                     if (!digits) return 0;
+                                     
+                                     return isNegative ? -parseInt(digits, 10) : parseInt(digits, 10);
                                 }
                                 
                                 // 2. KOLOM TEKS (Pasien, Dokter, Kamar, Penjamin, Status)
+                                var str = (data === null || data === undefined) ? '' : String(data);
                                 if (str.indexOf('<') > -1) {
                                     // Ganti <br> dengan " - "
                                     // Hapus HTML tag

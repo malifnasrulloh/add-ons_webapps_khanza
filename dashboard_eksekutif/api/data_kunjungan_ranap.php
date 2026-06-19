@@ -62,8 +62,15 @@ try {
     $sql_limit = ($length != -1) ? " LIMIT " . (int)$start . ", " . (int)$length : "";
 
     $sql_data = "SELECT ki.no_rawat, ki.tgl_masuk, ki.jam_masuk, ki.stts_pulang,
-                 p.nm_pasien, p.no_rkm_medis, d.nm_dokter, b.nm_bangsal, k.kd_kamar,
-                 pj.png_jawab, pj.kd_pj, rp.biaya_reg
+                 p.nm_pasien, p.no_rkm_medis, b.nm_bangsal, k.kd_kamar,
+                 pj.png_jawab, pj.kd_pj, rp.biaya_reg,
+                 -- Fetch DPJP from dpjp_ranap, fallback to reg_periksa doctor
+                 COALESCE(
+                     (SELECT d2.nm_dokter FROM dpjp_ranap dr JOIN dokter d2 ON dr.kd_dokter = d2.kd_dokter WHERE dr.no_rawat = ki.no_rawat ORDER BY dr.kd_dokter DESC LIMIT 1),
+                     d.nm_dokter
+                 ) AS nm_dokter,
+                 -- Flag to check if it is fallback (1 = fallback, 0 = has DPJP)
+                 CASE WHEN (SELECT COUNT(*) FROM dpjp_ranap dr WHERE dr.no_rawat = ki.no_rawat) > 0 THEN 0 ELSE 1 END AS is_dpjp_fallback
                  FROM kamar_inap ki 
                  JOIN reg_periksa rp ON ki.no_rawat = rp.no_rawat
                  JOIN pasien p ON rp.no_rkm_medis = p.no_rkm_medis
@@ -88,8 +95,8 @@ try {
             "no_rawat"       => $r['no_rawat'],
             "pasien"         => $r['nm_pasien'],
             "rm"             => $r['no_rkm_medis'],
-            "dpjp"           => $r['nm_dokter'],  // Placeholder, diupdate async
-            "is_dpjp_fallback" => false,
+            "dpjp"           => $r['nm_dokter'],
+            "is_dpjp_fallback" => ((int)$r['is_dpjp_fallback'] === 1),
             "kamar"          => $r['nm_bangsal'],
             "penjamin"       => $r['png_jawab'],
             "kd_pj"          => $r['kd_pj'],

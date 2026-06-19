@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="7200"> <!-- Hard refresh every 2 hours -->
     <title id="pageTitle">Terminal Auto-Sync Siranap</title>
     <link id="favicon" rel="icon" type="image/x-icon" href="">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -179,12 +180,32 @@
     </footer>
 
 <script>
-    // 15 minutes = 900 seconds
-    const SYNC_INTERVAL_SEC = 900; 
+    const SYNC_INTERVAL_SEC = 20; 
     let isRunning = false;
     let countdown = SYNC_INTERVAL_SEC;
     let timer = null;
     let isSyncingNow = false;
+    let expectedTime = 0;
+    
+    // Auto-reconnect listeners
+    window.addEventListener('offline', () => {
+        log('KONEKSI INTERNET TERPUTUS. Menunggu jaringan kembali...', 'error');
+        statusText.textContent = 'OFFLINE';
+        statusText.className = 'text-danger';
+        statusIndicator.classList.remove('active');
+        statusIndicator.style.backgroundColor = '#ef4444';
+    });
+    
+    window.addEventListener('online', () => {
+        log('KONEKSI INTERNET KEMBALI. Melanjutkan auto-sync...', 'success');
+        if (isRunning) {
+            statusText.textContent = 'RUNNING';
+            statusText.className = 'text-success';
+            statusIndicator.classList.add('active');
+            statusIndicator.style.backgroundColor = '';
+            forceSync(); // Segera sinkron saat internet kembali
+        }
+    });
 
     // Fetch branding on load
     fetch('api_mapping.php?action=get_setting')
@@ -201,7 +222,7 @@
                     document.getElementById('favicon').href = data.logo;
                 }
             }
-        });
+        }).catch(e => console.log('Branding load failed', e));
 
     const termWindow = document.getElementById('terminalWindow');
     const statusIndicator = document.getElementById('statusIndicator');
@@ -264,26 +285,43 @@
         return `${m}:${s}`;
     }
 
+    function step() {
+        if (!isRunning) return;
+        
+        const now = Date.now();
+        const dt = now - expectedTime;
+
+        if (dt > 1000) {
+            // Browser throttling detected / tab inactive
+            const missedSeconds = Math.floor(dt / 1000);
+            countdown -= missedSeconds;
+            expectedTime += missedSeconds * 1000;
+        }
+
+        if (countdown <= 0) {
+            processSync();
+        } else {
+            countdownText.textContent = `Next sync in: ${formatTime(countdown)}`;
+        }
+        
+        countdown--;
+        expectedTime += 1000;
+        timer = setTimeout(step, Math.max(0, 1000 - (Date.now() - expectedTime)));
+    }
+
     function toggleSync() {
         isRunning = !isRunning;
         if (isRunning) {
             log('Auto-Sync Engine STARTED.', 'success');
             btnToggle.innerHTML = '<i class="fas fa-stop me-1"></i> Stop Auto-Sync';
             statusIndicator.classList.add('active');
-            statusText.textContent = 'RUNNING';
-            statusText.className = 'text-success';
+            statusText.textContent = navigator.onLine ? 'RUNNING' : 'OFFLINE';
+            statusText.className = navigator.onLine ? 'text-success' : 'text-danger';
             
             // Initial sync on start
+            expectedTime = Date.now();
             forceSync();
-            
-            timer = setInterval(() => {
-                countdown--;
-                countdownText.textContent = `Next sync in: ${formatTime(countdown)}`;
-                
-                if (countdown <= 0) {
-                    processSync();
-                }
-            }, 1000);
+            timer = setTimeout(step, 1000);
         } else {
             log('Auto-Sync Engine STOPPED.', 'error');
             btnToggle.innerHTML = '<i class="fas fa-play me-1"></i> Start Auto-Sync';
@@ -291,7 +329,7 @@
             statusText.textContent = 'STOPPED';
             statusText.className = 'text-danger';
             countdownText.textContent = 'Next sync in: --:--';
-            clearInterval(timer);
+            clearTimeout(timer);
         }
     }
 
@@ -307,14 +345,27 @@
 
     async function processSync(isForced = false) {
         if (isSyncingNow) return;
+        
+        if (!navigator.onLine) {
+            log('Internet offline. Skipping sync cycle.', 'warning');
+            countdown = SYNC_INTERVAL_SEC;
+            return;
+        }
+
         isSyncingNow = true;
         
         log(`Initiating sync process to Kemkes (sirs.kemkes.go.id)...${isForced ? ' [FORCED COMPLETE SYNC]' : ''}`, 'sync');
+
+        // Anti-hang timeout 15 detik menggunakan AbortController
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
         
         try {
             const url = isForced ? 'process_sync.php?force=true' : 'process_sync.php';
-            const response = await fetch(url);
+            const response = await fetch(url, { signal: controller.signal });
             const data = await response.json();
+            
+            clearTimeout(timeoutId);
             
             // Log raw GET response debug info first (if present)
             if (data.get_debug) {
@@ -336,10 +387,10 @@ ${respText}
 </details>`;
                 logRaw(getLogMsg);
             }
-
             if (data.status === 'success') {
                 if (data.changes === 0) {
-                    log(`Sync completed. No changes detected since last sync.`, 'info');
+                    // Opsional: Disable log info rutin agar terminal tidak penuh jika tidak ada perubahan
+                    // log(`Pengecekan db rs selesai, tidak ada perubahan.`, 'info'); 
                 } else {
                     log(`Sync completed. Processed ${data.changes} action(s).`, 'success');
                 }
@@ -375,10 +426,16 @@ ${item.curl_error ? `<strong>Curl Error:</strong> ${escapeHtml(item.curl_error)}
                 log(`Sync failed: ${data.message}`, 'error');
             }
         } catch (error) {
-            log(`Network/Parse Error: ${error.message}`, 'error');
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                log(`Timeout Error: Request ke server terhenti karena terlalu lama (>15 detik).`, 'error');
+            } else {
+                log(`Network/Parse Error: ${error.message}`, 'error');
+            }
         } finally {
             isSyncingNow = false;
             countdown = SYNC_INTERVAL_SEC; // Reset timer after sync resolves
+            expectedTime = Date.now(); // Reset expectation
         }
     }
 
@@ -392,6 +449,9 @@ ${item.curl_error ? `<strong>Curl Error:</strong> ${escapeHtml(item.curl_error)}
  |_____/|_____|_|  \\_\\/_/    \\_\\_| \\_/_/    \\_\\_|     
                                                       
  v3.0 BRIDGING INTERFACE INITIALIZED.
+ DOM Bloat Guard: 500 lines max.
+ Hard Refresh Guard: 2 hours.
+ Browser Hang Guard: Active.
 `, 'info');
     log('Awaiting command...', 'info');
     

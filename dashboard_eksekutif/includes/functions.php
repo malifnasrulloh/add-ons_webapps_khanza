@@ -1,27 +1,51 @@
 <?php
-// 1. Fungsi Format Rupiah
+// File: includes/functions.php (SECURITY HARDENED & POLYMORPHIC)
+
+/**
+ * Format currency to Indonesian Rupiah
+ */
 function formatRupiah($angka) {
-    $hasil_rupiah = "Rp " . number_format($angka, 0, ',', '.');
-    return $hasil_rupiah;
+    return "Rp " . number_format((float)$angka, 0, ',', '.');
 }
 
-// 2. Fungsi Mengambil Jam Shift
-function getShiftTimes($koneksi) {
+/**
+ * Retrieve shift times from database (Polymorphic: supports PDO & MySQLi)
+ */
+function getShiftTimes($conn = null) {
+    if ($conn === null) {
+        global $koneksi_pdo;
+        $conn = $koneksi_pdo;
+    }
+    
     $shifts = [];
     $sql = "SELECT closing_kasir.shift, closing_kasir.jam_masuk, closing_kasir.jam_pulang FROM closing_kasir";
-    $result = $koneksi->query($sql);
-    if ($result) {
-        while ($row = $result->fetch_assoc()) {
+    
+    if ($conn instanceof PDO) {
+        $stmt = $conn->query($sql);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $shifts[$row['shift']] = [
                 'masuk' => $row['jam_masuk'],
                 'pulang' => $row['jam_pulang']
             ];
         }
+    } else {
+        // Fallback for legacy MySQLi
+        $result = $conn->query($sql);
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $shifts[$row['shift']] = [
+                    'masuk' => $row['jam_masuk'],
+                    'pulang' => $row['jam_pulang']
+                ];
+            }
+        }
     }
     return $shifts;
 }
 
-// 3. Fungsi Menghitung Rentang DateTime untuk Kueri
+/**
+ * Compute the DateTime range for a given date and shift, handling night shifts crossing midnight.
+ */
 function getShiftDateTimeRange($tanggal_str, $shift, $shift_times) {
     if (!isset($shift_times[$shift])) {
         return null; 
@@ -32,7 +56,7 @@ function getShiftDateTimeRange($tanggal_str, $shift, $shift_times) {
     $dt_awal_str = $tanggal_str . ' ' . $jam_masuk;
     $dt_akhir_str = $tanggal_str . ' ' . $jam_pulang;
 
-    // Logika lintas hari (Shift Malam)
+    // Handle cross-midnight night shifts
     if (strtotime($jam_masuk) > strtotime($jam_pulang)) {
         $tanggal_obj = new DateTime($tanggal_str);
         $tanggal_obj->modify('+1 day');
@@ -46,39 +70,67 @@ function getShiftDateTimeRange($tanggal_str, $shift, $shift_times) {
     ];
 }
 
-// --- FUNGSI TAMBAHAN DARI KUNJUNGAN AKTIF ---
-
-// 4. Cari Isi Angka (Meniru Sequel.java)
-function cariIsiAngka($conn, $sql, $no_rawat) {
-    $value = 0;
-    $stmt = $conn->prepare($sql);
-    if ($stmt) {
-        $stmt->bind_param("s", $no_rawat);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($row = $result->fetch_array()) {
-            $value = $row[0];
-        }
-        $stmt->close();
+/**
+ * Retrieve a numeric column value (Polymorphic: supports PDO & MySQLi)
+ */
+function cariIsiAngka($conn, $sql, $parameter) {
+    if ($conn === null) {
+        global $koneksi_pdo;
+        $conn = $koneksi_pdo;
     }
-    // Pastikan return 0 jika null
-    return floatval($value);
+    
+    if ($conn instanceof PDO) {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([$parameter]);
+        $val = $stmt->fetchColumn();
+        return $val !== false ? floatval($val) : 0.0;
+    } else {
+        // Fallback for legacy MySQLi
+        $value = 0;
+        $stmt = $conn->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("s", $parameter);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($row = $result->fetch_array()) {
+                $value = $row[0];
+            }
+            $stmt->close();
+        }
+        return floatval($value);
+    }
 }
 
-// 5. Cari Isi String
-function cariIsi($conn, $sql, $no_rawat) {
-    $value = "";
-    $stmt = $conn->prepare($sql);
-    if ($stmt) {
-        $stmt->bind_param("s", $no_rawat);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($row = $result->fetch_array()) {
-            $value = $row[0];
-        }
-        $stmt->close();
+/**
+ * Retrieve a string column value (Polymorphic: supports PDO & MySQLi)
+ */
+function cariIsi($conn, $sql, $parameter) {
+    if ($conn === null) {
+        global $koneksi_pdo;
+        $conn = $koneksi_pdo;
     }
-    return $value;
+    
+    if ($conn instanceof PDO) {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([$parameter]);
+        $val = $stmt->fetchColumn();
+        return $val !== false ? strval($val) : "";
+    } else {
+        // Fallback for legacy MySQLi
+        $value = "";
+        $stmt = $conn->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("s", $parameter);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($row = $result->fetch_array()) {
+                $value = $row[0];
+            }
+            $stmt->close();
+        }
+        return $value;
+    }
 }
+
 
 ?>

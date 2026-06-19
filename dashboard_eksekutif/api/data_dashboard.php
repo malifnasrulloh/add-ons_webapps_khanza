@@ -34,6 +34,14 @@ $response = [
         'ralan' => array_fill(0, 12, 0),
         'ranap' => array_fill(0, 12, 0),
         'total' => array_fill(0, 12, 0)
+    ],
+    'top_farmasi' => [
+        'labels' => [],
+        'data' => []
+    ],
+    'top_booking' => [
+        'labels' => [],
+        'data' => []
     ]
 ];
 
@@ -209,6 +217,42 @@ try {
     }
     
     $response['tren'] = ['ralan' => array_values($d_ralan), 'ranap' => array_values($d_ranap), 'total' => array_values($d_total)];
+
+    // ==========================================================================
+    // 7. TOP 10 FARMASI
+    // ==========================================================================
+    $sql_farmasi = "SELECT b.nama_brng AS nama, COUNT(a.kode_brng) AS jumlah
+                    FROM detail_pemberian_obat a 
+                    INNER JOIN databarang b ON a.kode_brng = b.kode_brng  
+                    WHERE a.tgl_perawatan = :today 
+                    GROUP BY b.nama_brng 
+                    ORDER BY jumlah DESC 
+                    LIMIT 10";
+    $stmt_farmasi = $koneksi_pdo->prepare($sql_farmasi);
+    $stmt_farmasi->execute([':today' => $today]);
+    while($r = $stmt_farmasi->fetch(PDO::FETCH_ASSOC)) {
+        $response['top_farmasi']['labels'][] = strlen($r['nama']) > 20 ? substr($r['nama'], 0, 20) . '...' : $r['nama'];
+        $response['top_farmasi']['data'][] = (int)$r['jumlah'];
+    }
+
+    // ==========================================================================
+    // 8. TOP 10 BOOKING ONLINE
+    // ==========================================================================
+    $sql_booking = "SELECT p.nm_poli AS nmpoli, COUNT(br.no_rkm_medis) AS total 
+                    FROM booking_registrasi br 
+                    INNER JOIN poliklinik p ON br.kd_poli = p.kd_poli 
+                    WHERE br.limit_reg = '1' AND br.tanggal_periksa = :today 
+                    GROUP BY p.nm_poli 
+                    ORDER BY total DESC  
+                    LIMIT 10";
+    $stmt_booking = $koneksi_pdo->prepare($sql_booking);
+    $stmt_booking->execute([':today' => $today]);
+    while($r = $stmt_booking->fetch(PDO::FETCH_ASSOC)) {
+        $response['top_booking']['labels'][] = $r['nmpoli'];
+        $response['top_booking']['data'][] = (int)$r['total'];
+    }
+
+
 
 } catch (PDOException $e) {
     // Return empty valid JSON with safe defaults defined at the top

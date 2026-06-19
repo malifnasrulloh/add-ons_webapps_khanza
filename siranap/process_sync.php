@@ -103,7 +103,7 @@ try {
             JOIN bangsal C ON A.kd_bangsal = C.kd_bangsal
             LEFT JOIN kamar B ON A.kd_bangsal = B.kd_bangsal AND B.statusdata = '1' AND (
                 (A.nm_ruang_sirsonline = 'VVIP' AND B.kelas = 'Kelas VVIP') OR
-                (A.nm_ruang_sirsonline = 'VIP' AND B.kelas = 'Kelas VIP') OR
+                (A.nm_ruang_sirsonline = 'VIP' AND (B.kelas = 'Kelas VIP' OR B.kelas = 'Kelas Utama')) OR
                 (A.nm_ruang_sirsonline = 'Kelas Utama' AND B.kelas = 'Kelas Utama') OR
                 (A.nm_ruang_sirsonline = 'Kelas I' AND B.kelas = 'Kelas 1') OR
                 (A.nm_ruang_sirsonline = 'Kelas II' AND B.kelas = 'Kelas 2') OR

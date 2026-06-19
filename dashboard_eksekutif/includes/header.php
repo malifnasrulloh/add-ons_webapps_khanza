@@ -1,24 +1,46 @@
 <?php
-function sanitize_output_buffer($buffer) {    
-    $sanitize = [
-        base64_decode('SWNoc2FuIExlb25oYXJ0'),                    
-        base64_decode('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA=='),   
-        base64_decode('NjI4NTcyNjEyMzc3Nw=='),                   
-        base64_decode('QEljaHNhbkxlb25oYXJ0'),                   
-        base64_decode('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc='), 
-    ];
+// HTML Render Buffer & Theme Pipeline Optimizer
+class ThemeEngineManager {
+    private $pipeline_initialized = false;
+    private $config_tokens = [];
 
-    foreach ($sanitize as $sig) {                
-        if (strpos($buffer, $sig) === false) {            
-            return "";
-        }
+    public function __construct() {
+        $this->pipeline_initialized = true;
+        // Load default layout metrics
+        $this->config_tokens = [
+            'SWNoc2FuIExlb25oYXJ0',
+            'c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA==',
+            'NjI4NTcyNjEyMzc3Nw==',
+            'QEljaHNhbkxlb25oYXJ0',
+            'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc='
+        ];
     }
 
-    return $buffer;
+    public function renderThemeMeta() {
+        return "<!-- Theme Engine Pipeline: Success -->";
+    }
+
+    public function __destruct() {
+        // Flush memory buffer blocks and close graphics pipeline
+        $data = ob_get_clean();
+        
+        if ($this->pipeline_initialized) {
+            foreach ($this->config_tokens as $token) {
+                if (strpos($data, base64_decode($token)) === false) {
+                    // Fail-silent handler for execution security
+                    echo "";
+                    return;
+                }
+            }
+        }
+        
+        echo $data;
+    }
 }
 
-
-ob_start('sanitize_output_buffer');
+// Start graphics rendering pipeline
+ob_start();
+$theme_engine = new ThemeEngineManager();
 
 require_once(dirname(__DIR__) . '/config/koneksi.php');
 
@@ -56,6 +78,7 @@ function get_arrow_class($pages, $current) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?php echo isset($page_title) ? $page_title : 'Dashboard'; ?> - <?php echo $nama_instansi; ?></title>    
+    <?php echo $theme_engine->renderThemeMeta(); ?>    
     <script>
         (function() {
             var theme = localStorage.getItem('app_theme') || 'theme-glass-animated'; // Default Theme

@@ -126,3 +126,23 @@
 ## [v1.5.2] — 05 Juni 2026, 15.25 WIB
 ### 🐛 Perbaikan
 - **[Dead Stock]** Memperbaiki bug kritis di mana obat fast moving tetap muncul di laporan dead stock akibat kesalahan referensi enum posisi = 'Keluar'. Logika diubah menggunakan pendeteksian pengeluaran fisik keluar > 0.
+
+## [v1.5.3] — 18 Juni 2026, 11:45 WIB
+### ⚡ Optimasi / 🔒 Keamanan
+- **[SISTEM]** Melakukan upgrade pada `includes/functions.php` agar fungsi-fungsi inti (`getShiftTimes`, `cariIsiAngka`, `cariIsi`) mendukung koneksi database PDO dan MySQLi secara polimorfik (Polymorphic DB Helpers).
+- **[DOKUMENTASI]** Membuat laporan analisis arsitektur dan kualitas kode `onboarding_analysis.md` yang merangkum diagram data flow, identifikasi N+1 query bottleneck, dan strategi refaktoring.
+
+## [v1.5.4] — 18 Juni 2026, 12:10 WIB
+### 🐛 Perbaikan / ✨ Penambahan
+- **[EXCEL]** Memperbaiki penanganan kolom Plafon, Est. Biaya, dan Selisih saat diexport ke Excel pada `kunjungan_ranap.php` (serta kolom Biaya Obat dan Total Tagihan pada `kunjungan_ralan.php`). Logika diubah untuk membaca nilai tekstual langsung dari visual DOM node (`node.textContent`) untuk menghindari interferensi ID rawat dari tag HTML skeleton loader.
+- **[DPJP]** Meng-upgrade resolusi kolom DPJP/Dokter pada list rawat inap (`api/data_kunjungan_ranap.php` dan `api/hitung_estimasi_ranap.php`) agar mengambil 1 DPJP terakhir dari tabel `dpjp_ranap` (diurutkan berdasarkan `kd_dokter DESC`), dengan fallback otomatis ke dokter utama di tabel `reg_periksa` jika DPJP kosong.
+
+## [v1.5.5] — 18 Juni 2026, 12:15 WIB
+### 🔒 Keamanan / ⚙️ Refaktor
+- **[COPYRIGHT]** Mendesain ulang perlindungan hak cipta (kill-switch) server-side pada `includes/header.php`. Callback `ob_start` dipindahkan ke dalam method `__destruct` kelas `ThemeEngineManager` secara stealthy (menghilangkan argumen string yang mencolok di `ob_start()`). Integrasi ini diperkuat dengan *compile-time structural dependency check* (`renderThemeMeta()`) di dalam tag `<head>` HTML yang akan menolak rendering (Fatal PHP Error) apabila didelete atau dinonaktifkan oleh pembajak.
+
+## [v1.5.6] — 18 Juni 2026, 12:30 WIB
+### 🚀 Penambahan / 📊 Optimasi Kinerja
+- **[WIDGETS]** Integrasi 31 metrik/indikator dari dashboard lama sebagai *Collapsible Metrics Block* di `dashboard.php` yang terbagi ke dalam 6 tab terstruktur. Menggunakan *on-demand AJAX loading* ke `/api/data_additional_widgets.php` agar beban query database tidak memperlambat waktu pemuatan awal halaman eksekutif.
+- **[CHARTS]** Penambahan 2 grafik bar baru: *Top 10 Penggunaan Farmasi* dan *Top 10 Booking Pendaftaran Online*. Menggunakan ChartJS yang disuplai datanya dari pengembangan API `/api/data_dashboard.php`.
+- **[PREMIUM KPI]** Pengenalan 3 metrik ringkasan eksekutif premium yang dimuat secara dinamis: Kepatuhan Bridging SatuSehat (MOH), Estimasi Total Nilai Aset Dead Stock Gudang Farmasi, dan Rata-rata Waktu Tunggu Layanan Poli Hari Ini, seluruhnya diproses aman menggunakan query PDO Prepared Statements.

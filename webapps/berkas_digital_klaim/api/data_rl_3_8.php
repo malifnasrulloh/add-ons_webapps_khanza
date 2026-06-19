@@ -75,8 +75,6 @@ function parseGiziVal($str) {
 }
 
 // 1. Ambil data periksa lab detail & PK/PA/MB (Di SIK Khanza, table detail_periksa_lab merujuk lab PK)
-// Kita hubungkan ke template_laboratorium & rekam medis pasien utk jenis kelamin.
-
 $sql = "
     SELECT 
         d.nilai,
@@ -114,7 +112,7 @@ if ($stmt) {
         else if (strpos($nama_pem, 'lekosit') !== false || $nama_pem == 'wbc' || strpos($nama_pem, 'leukosit') !== false) $cat = '1.3';
         else if (strpos($nama_pem, 'eritrosit') !== false || $nama_pem == 'rgb' || strpos($nama_pem, 'rbc') !== false) $cat = '1.4';
         else if (strpos($nama_pem, 'eosinop') !== false) $cat = '1.5';
-        else if (strpos($nama_pem, 'jenis') !== false && strpos($nama_pem, 'leko') !== false) $cat = '1.6'; // Diff count
+        else if (strpos($nama_pem, 'jenis') !== false && strpos($nama_pem, 'leko') !== false) $cat = '1.6'; 
         else if (strpos($nama_pem, 'endap darah') !== false || $nama_pem == 'led' || $nama_pem == 'esr') $cat = '1.7';
         else if (strpos($nama_pem, 'retik') !== false) $cat = '1.8';
         else if (strpos($nama_pem, 'trombosit') !== false || $nama_pem == 'plt') $cat = '1.9';
@@ -184,20 +182,17 @@ if ($stmt) {
 
         // =======================
         // B. MIKROBIOLOGI / C. PARASITOLOGI
-        // (Beberapa rs menggabungkannya di PK, bbrp di MB) - Kita baca dari PK dulu sbg fallback
         // =======================
         if (empty($cat)) {
             if (strpos($nama_pem, 'bta') !== false || strpos($nama_pem, 'tbc') !== false || strpos($nama_pem, 'dahak') !== false) {
-                 // 6. Mikroskopis TBC BTA
                  $v = strtolower($val_str);
                  if (strpos($v, 'negatif') !== false || $v == '-') $cat = '6.1';
                  else if (strpos($v, '1-9') !== false) $cat = '6.2';
                  else if (strpos($v, '1+') !== false || $v == '+1') $cat = '6.3';
                  else if (strpos($v, '2+') !== false || $v == '+2') $cat = '6.4';
                  else if (strpos($v, '3+') !== false || $v == '+3') $cat = '6.5';
-                 else $cat = '6.6'; // Tidak Dilakukan / lain
+                 else $cat = '6.6'; 
                  
-                 // If TCM (TBC RO) - usually string matches differently
                  if (strpos($nama_pem, 'tcm') !== false || strpos($nama_pem, 'genexpert') !== false) {
                     if (strpos($v, 'negatif') !== false || strpos($v, 'not detected') !== false) $cat = '11.1';
                     else if (strpos($v, 'rif sen') !== false || (strpos($v, 'detected') !== false && strpos($v, 'not resistance') !== false)) $cat = '11.2';
@@ -207,13 +202,11 @@ if ($stmt) {
                     else $cat = '11.8';
                  }
             }
-            else if (strpos($nama_pem, 'pcr sars') !== false || strpos($nama_pem, 'pcr covid') !== false) $cat = '10.2'; // PCR Covid
+            else if (strpos($nama_pem, 'pcr sars') !== false || strpos($nama_pem, 'pcr covid') !== false) $cat = '10.2'; 
         }
 
-        // Perekaman
+        // Perekaman data PK
         if (!empty($cat) && isset($result_data[$cat])) {
-            
-            // Increment Count
             if ($jk == 'L') {
                 $result_data[$cat]['jml_l']++;
                 if ($val_num !== null) $result_data[$cat]['total_val_l'] += $val_num;
@@ -222,34 +215,36 @@ if ($stmt) {
                 if ($val_num !== null) $result_data[$cat]['total_val_p'] += $val_num;
             }
         }
-        
     }
     mysqli_stmt_close($stmt);
 }
 
-// 2. Ambil data dari detail_periksa_labpa (Patologi Anatomi) jika menggunakan modul PA Khanza
+// 2. Ambil data dari detail_periksa_labpa (Patologi Anatomi)
+// Menggunakan jns_perawatan_lab karena detail_periksa_labpa tidak memiliki id_template
 $sql_pa = "
     SELECT 
-        d.diagnosa_klinis as keterangan,
-        t.Pemeriksaan,
+        d.diagnosa_klinik as keterangan,
+        j.nm_perawatan as Pemeriksaan,
         p.jk
     FROM detail_periksa_labpa d
-    INNER JOIN template_laboratorium t ON d.id_template = t.id_template
+    INNER JOIN jns_perawatan_lab j ON d.kd_jenis_prw = j.kd_jenis_prw
     INNER JOIN reg_periksa rp ON d.no_rawat = rp.no_rawat
     INNER JOIN pasien p ON rp.no_rkm_medis = p.no_rkm_medis
     WHERE d.tgl_periksa BETWEEN ? AND ?
 ";
+
 $stmt_pa = mysqli_prepare($koneksi, $sql_pa);
 if ($stmt_pa) {
     mysqli_stmt_bind_param($stmt_pa, "ss", $tgl_awal, $tgl_akhir);
     mysqli_stmt_execute($stmt_pa);
     $res_pa = mysqli_stmt_get_result($stmt_pa);
+    
     while ($row_pa = mysqli_fetch_assoc($res_pa)) {
         $nama_pem = strtolower(trim($row_pa['Pemeriksaan']));
         $jk = $row_pa['jk'];
         $cat = '';
         
-        // D. PATOLOGI ANATOMI
+        // D. PATOLOGI ANATOMI Kategori Matching
         if (strpos($nama_pem, 'sitopatologi') !== false) {
             if (strpos($nama_pem, 'pap') !== false) $cat = '18.1';
             else if (strpos($nama_pem, 'non gin') !== false) $cat = '18.2';
@@ -271,7 +266,6 @@ if ($stmt_pa) {
     }
     mysqli_stmt_close($stmt_pa);
 }
-
 
 // Finalize Averages
 foreach ($result_data as $cat => $data) {

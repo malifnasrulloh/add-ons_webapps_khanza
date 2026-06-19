@@ -241,13 +241,19 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
             </div>
         </div>
         <div>
+            <button class="btn btn-glass me-2" id="btnManualSync" onclick="manualSync(this)">
+                <i class="fas fa-sync-alt me-1"></i> Sinkron Sekarang
+            </button>
+            <button class="btn btn-glass me-2" onclick="new bootstrap.Modal(document.getElementById('modalLogConsole')).show()">
+                <i class="fas fa-terminal me-1"></i> Log Console
+            </button>
             <button class="btn btn-glass me-2 text-warning fw-semibold" onclick="runDbSetup(this)">
                 <i class="fas fa-database me-1"></i> Setup DB
             </button>
             <button class="btn btn-glass me-2 text-info fw-semibold" onclick="openAppSettings()">
                 <i class="fas fa-cog me-1"></i> Pengaturan
             </button>
-            <a href="auto_sync.php" class="btn btn-glass me-2" target="_blank"><i class="fas fa-terminal me-1"></i> Terminal Auto-Sync</a>
+            <a href="auto_sync.php" class="btn btn-glass me-2" target="_blank"><i class="fas fa-robot me-1"></i> Terminal Auto-Sync</a>
             <button class="btn btn-glass me-2 text-danger fw-semibold" onclick="handleLogout()">
                 <i class="fas fa-sign-out-alt me-1"></i> Logout
             </button>
@@ -358,6 +364,27 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
   </div>
 </div>
 
+<!-- Modal Log Console -->
+<div class="modal fade" id="modalLogConsole" tabindex="-1" aria-labelledby="modalLogConsoleLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content glass-modal">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="modalLogConsoleLabel"><i class="fas fa-terminal me-2"></i> Log Sinkronisasi Manual</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="logConsoleContainer" class="p-3 rounded" style="background-color: #1e293b; color: #00ff00; font-family: 'JetBrains Mono', monospace; height: 300px; overflow-y: auto; font-size: 0.85rem;">
+            <div>> Menunggu perintah sinkronisasi...</div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-glass" onclick="document.getElementById('logConsoleContainer').innerHTML = '<div>> Menunggu perintah sinkronisasi...</div>'">Bersihkan Log</button>
+        <button type="button" class="btn btn-primary-custom" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal DB Setup -->
 <div class="modal fade" id="modalDbSetup" tabindex="-1" aria-labelledby="modalDbSetupLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -445,7 +472,6 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
         Contact: <a href="https://wa.me/6285726123777" target="_blank">6285726123777</a> | <a href="https://t.me/IchsanLeonhart" target="_blank">@IchsanLeonhart</a>
     </p>
 </footer>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let referensi = [
@@ -854,6 +880,67 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
         });
     }
 
+    function appendToLogConsole(message, type = 'info') {
+        const consoleContainer = document.getElementById('logConsoleContainer');
+        const d = new Date();
+        const timeStr = d.toLocaleTimeString('id-ID', { hour12: false });
+        
+        let color = '#38bdf8'; // info
+        if (type === 'success') color = '#4ade80';
+        if (type === 'error') color = '#f87171';
+        if (type === 'warning') color = '#facc15';
+
+        const line = document.createElement('div');
+        line.style.marginBottom = '5px';
+        line.innerHTML = `<span style="color: #94a3b8;">[${timeStr}]</span> <span style="color: ${color};">${message}</span>`;
+        consoleContainer.appendChild(line);
+        consoleContainer.scrollTop = consoleContainer.scrollHeight;
+    }
+
+    function manualSync(btn) {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Sinkronisasi...';
+        btn.disabled = true;
+        
+        appendToLogConsole('Memulai sinkronisasi manual ke Kemenkes...', 'info');
+
+        fetch('process_sync.php')
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    btn.classList.add('feedback-success');
+                    btn.innerHTML = '<i class="fas fa-check me-1"></i> Sukses!';
+                    
+                    if (data.changes === 0) {
+                        appendToLogConsole('Sinkronisasi selesai. Tidak ada perubahan data.', 'info');
+                    } else {
+                        appendToLogConsole(`Sinkronisasi selesai. Berhasil memproses ${data.changes} data tempat tidur.`, 'success');
+                        if (data.logs && data.logs.length > 0) {
+                            data.logs.forEach(msg => appendToLogConsole(`> ${msg}`, 'success'));
+                        }
+                    }
+
+                    setTimeout(() => {
+                        btn.classList.remove('feedback-success');
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    showToast('Gagal sinkronisasi: ' + data.message, true);
+                    appendToLogConsole(`Gagal: ${data.message}`, 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                showToast('Terjadi kesalahan jaringan saat sinkronisasi', true);
+                appendToLogConsole(`Terjadi kesalahan jaringan/timeout.`, 'error');
+            });
+    }
+
     function runDbSetup(btn) {
         const originalText = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Running...';
@@ -878,7 +965,6 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
                 if (res.status === 'success') {
                     const logs = res.details || [];
                     
-                    // Add initial check
                     appendSetupLog('Menganalisis skema database...', 'info');
                     await new Promise(r => setTimeout(r, 400));
 
@@ -895,12 +981,11 @@ $isLoggedIn = isset($_SESSION['siranap_admin']);
                                 icon = '<i class="fas fa-database text-info me-2"></i>';
                             }
                             appendSetupLog(log.text, log.status, icon);
-                            await new Promise(r => setTimeout(r, 500)); // Animated delay
+                            await new Promise(r => setTimeout(r, 500)); 
                         }
                         statusDiv.innerHTML = `<div class="alert alert-success border-0 mb-0"><i class="fas fa-check-circle me-1"></i> ${res.message}</div>`;
                     }
                     
-                    // Reload UI structures
                     fetchBranding();
                     loadBangsal();
                     loadMapping();
