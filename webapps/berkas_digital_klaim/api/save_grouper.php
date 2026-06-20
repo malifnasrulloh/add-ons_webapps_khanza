@@ -20,14 +20,13 @@ if (!$koneksi) {
 }
 
 if (!isset($_SESSION['casemix_login'])) {
-    // Tetap 200 agar ditangkap AJAX success tapi status error
     echo json_encode(['status' => 'error', 'message' => 'Sesi habis. Silakan login ulang.']);
     exit;
 }
 
-$caseId = isset($_POST['case']) ? str_replace('-', '/', $_POST['case']) : '';
-$kode   = isset($_POST['kode']) ? trim($_POST['kode']) : '';
-$tarif  = isset($_POST['tarif']) ? floatval($_POST['tarif']) : 0;
+$caseId   = isset($_POST['case']) ? str_replace('-', '/', $_POST['case']) : '';
+$kode_raw = isset($_POST['kode']) ? $_POST['kode'] : '';
+$tarif    = isset($_POST['tarif']) ? floatval($_POST['tarif']) : 0;
 
 if (empty($caseId)) {
     echo json_encode(['status' => 'error', 'message' => 'No. Rawat tidak valid']);
@@ -39,23 +38,81 @@ if ($tarif <= 0) {
     exit;
 }
 
-// Cek Existing
-$cek = mysqli_query($koneksi, "SELECT no_rawat FROM perkiraan_biaya_ranap WHERE no_rawat='$caseId'");
-
-if (mysqli_num_rows($cek) > 0) {
-    $q = "UPDATE perkiraan_biaya_ranap SET kd_penyakit=?, tarif=? WHERE no_rawat=?";
-    $stmt = mysqli_prepare($koneksi, $q);
-    mysqli_stmt_bind_param($stmt, "sds", $kode, $tarif, $caseId);
+// Parse kode array or string safely
+$kodes = [];
+if (is_array($kode_raw)) {
+    foreach ($kode_raw as $k) {
+        $trimmed = trim($k);
+        if ($trimmed !== '') {
+            $kodes[] = $trimmed;
+        }
+    }
 } else {
-    $q = "INSERT INTO perkiraan_biaya_ranap (kd_penyakit, tarif, no_rawat) VALUES (?, ?, ?)";
-    $stmt = mysqli_prepare($koneksi, $q);
-    mysqli_stmt_bind_param($stmt, "sds", $kode, $tarif, $caseId);
+    $trimmed = trim($kode_raw);
+    if ($trimmed !== '') {
+        $kodes[] = $trimmed;
+    }
 }
 
-if ($stmt && mysqli_stmt_execute($stmt)) {
-    echo json_encode(['status' => 'success', 'message' => 'Data tersimpan!']);
+// Check if Multiple ICD (Composite Primary Key) schema is active
+$q_pk = mysqli_query($koneksi, "
+    SELECT COUNT(*) as pk_count 
+    FROM information_schema.KEY_COLUMN_USAGE 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'perkiraan_biaya_ranap' 
+      AND CONSTRAINT_NAME = 'PRIMARY'
+");
+$is_multiple = false;
+if ($q_pk && $r_pk = mysqli_fetch_assoc($q_pk)) {
+    if ((int)$r_pk['pk_count'] > 1) {
+        $is_multiple = true;
+    }
+}
+
+if ($is_multiple) {
+    // 1. Delete all existing mappings for this patient
+    mysqli_query($koneksi, "DELETE FROM perkiraan_biaya_ranap WHERE no_rawat='$caseId'");
+    
+    // 2. Insert new ones
+    if (!empty($kodes)) {
+        $q_insert = "INSERT INTO perkiraan_biaya_ranap (no_rawat, kd_penyakit, tarif) VALUES (?, ?, ?)";
+        $stmt = mysqli_prepare($koneksi, $q_insert);
+        if ($stmt) {
+            foreach ($kodes as $kd) {
+                mysqli_stmt_bind_param($stmt, "ssd", $caseId, $kd, $tarif);
+                mysqli_stmt_execute($stmt);
+            }
+            echo json_encode(['status' => 'success', 'message' => 'Data multiple ICD berhasil disimpan!']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Gagal menyiapkan statement database.']);
+        }
+    } else {
+        echo json_encode(['status' => 'success', 'message' => 'Data ICD berhasil dibersihkan!']);
+    }
 } else {
-    echo json_encode(['status' => 'error', 'message' => 'Database Error: ' . mysqli_error($koneksi)]);
+    // Legacy single mode
+    $kode = isset($kodes[0]) ? $kodes[0] : '';
+    if (empty($kode)) {
+        mysqli_query($koneksi, "DELETE FROM perkiraan_biaya_ranap WHERE no_rawat='$caseId'");
+        echo json_encode(['status' => 'success', 'message' => 'Data ICD berhasil dihapus!']);
+    } else {
+        $cek = mysqli_query($koneksi, "SELECT no_rawat FROM perkiraan_biaya_ranap WHERE no_rawat='$caseId'");
+        if (mysqli_num_rows($cek) > 0) {
+            $q = "UPDATE perkiraan_biaya_ranap SET kd_penyakit=?, tarif=? WHERE no_rawat=?";
+            $stmt = mysqli_prepare($koneksi, $q);
+            mysqli_stmt_bind_param($stmt, "sds", $kode, $tarif, $caseId);
+        } else {
+            $q = "INSERT INTO perkiraan_biaya_ranap (kd_penyakit, tarif, no_rawat) VALUES (?, ?, ?)";
+            $stmt = mysqli_prepare($koneksi, $q);
+            mysqli_stmt_bind_param($stmt, "sds", $kode, $tarif, $caseId);
+        }
+        
+        if ($stmt && mysqli_stmt_execute($stmt)) {
+            echo json_encode(['status' => 'success', 'message' => 'Data ICD berhasil disimpan!']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Database Error: ' . mysqli_error($koneksi)]);
+        }
+    }
 }
 
 mysqli_close($koneksi);

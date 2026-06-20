@@ -130,58 +130,59 @@ try {
         require_once dirname(__DIR__) . '/kfa_api_helper.php';
         $cred       = kfa_load_credential();
         $searchMode = ($cred && !empty($cred['kfa_search_mode'])) ? $cred['kfa_search_mode'] : 'database';
-$isFallback = false;
-if ($searchMode === 'api' && $cred && !empty($cred['client_id'])) {
-    $apiResults = kfa_search_from_api($cred, $q, 20);
+        $isFallback = false;
+        if ($searchMode === 'api' && $cred && !empty($cred['client_id'])) {
+            $apiResults = kfa_search_from_api($cred, $q, 20);
 
-    if ($apiResults !== null) {
+            if ($apiResults !== null) {
+                echo json_encode([
+                    'results' => $apiResults,
+                    'source'  => 'api',
+                    'pagination' => ['more' => false]
+                ]);
+                exit;
+            }
+            // API gagal → catat sebagai fallback
+            $isFallback = true;
+        }
+
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_kfa WHERE kfa_code LIKE :q OR display_name LIKE :q");
+        $stmtCount->execute([':q' => "%$q%"]);
+        $total = $stmtCount->fetchColumn();
+        $more = ($offset + $limit) < $total;
+
+        // ---- Mode Database (atau fallback) ----
+        $stmt = $pdo->prepare("
+            SELECT kfa_code AS id,
+                CONCAT(kfa_code, ' - ', display_name) AS text,
+                display_name,
+                '' as route_code,
+                '' as route_display,
+                '' as ucum_code
+            FROM satu_sehat_ref_kfa
+            WHERE kfa_code LIKE :q OR display_name LIKE :q
+            ORDER BY 
+                CASE WHEN kfa_code = :exact THEN 0 ELSE 1 END,
+                display_name ASC 
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':exact', $q);
+        $stmt->bindValue(':q', "%$q%");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
         echo json_encode([
-            'results' => $apiResults,
-            'source'  => 'api',
-            'pagination' => ['more' => false]
+            'results' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'source'  => $isFallback ? 'fallback' : 'database',
+            'pagination' => ['more' => $more]
         ]);
         exit;
     }
-    // API gagal → catat sebagai fallback
-    $isFallback = true;
-}
-
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$limit = 50;
-$offset = ($page - 1) * $limit;
-
-$stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_kfa WHERE kfa_code LIKE :q OR display_name LIKE :q");
-$stmtCount->execute([':q' => "%$q%"]);
-$total = $stmtCount->fetchColumn();
-$more = ($offset + $limit) < $total;
-
-// ---- Mode Database (atau fallback) ----
-$stmt = $pdo->prepare("
-    SELECT kfa_code AS id,
-           CONCAT(kfa_code, ' - ', display_name) AS text,
-           display_name,
-           '' as route_code,
-           '' as route_display,
-           '' as ucum_code
-    FROM satu_sehat_ref_kfa
-    WHERE kfa_code LIKE :q OR display_name LIKE :q
-    ORDER BY 
-        CASE WHEN kfa_code = :exact THEN 0 ELSE 1 END,
-        display_name ASC 
-    LIMIT :limit OFFSET :offset
-");
-$stmt->bindValue(':exact', $q);
-$stmt->bindValue(':q', "%$q%");
-$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-$stmt->execute();
-
-echo json_encode([
-    'results' => $stmt->fetchAll(PDO::FETCH_ASSOC),
-    'source'  => $isFallback ? 'fallback' : 'database',
-    'pagination' => ['more' => $more]
-]);
-exit;
 
     // ========================================================
     // 2b. REFRESH KFA TOKEN (resusitasi)

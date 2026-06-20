@@ -25,40 +25,79 @@ if (!isset($_SESSION['casemix_login']) || $_SESSION['casemix_role'] !== 'Super A
     exit;
 }
 
-// Cari nama constraint yang mereferensi tabel penyakit dari kolom kd_penyakit
-$sql_find = "SELECT CONSTRAINT_NAME 
-             FROM information_schema.KEY_COLUMN_USAGE 
-             WHERE TABLE_NAME = 'perkiraan_biaya_ranap' 
-             AND COLUMN_NAME = 'kd_penyakit' 
-             AND REFERENCED_TABLE_NAME = 'penyakit'";
+$action = isset($_POST['action']) ? $_POST['action'] : 'apply';
 
-$res_find = mysqli_query($koneksi, $sql_find);
-$found = 0;
-$errors = [];
-
-if ($res_find && mysqli_num_rows($res_find) > 0) {
-    while ($row = mysqli_fetch_assoc($res_find)) {
-        $cname = $row['CONSTRAINT_NAME'];
-        $sql_alter = "ALTER TABLE perkiraan_biaya_ranap DROP FOREIGN KEY $cname";
-        if (mysqli_query($koneksi, $sql_alter)) {
-            $found++;
-        } else {
-            $errors[] = mysqli_error($koneksi);
+if ($action === 'apply') {
+    // 1. Check if it is already a composite PK
+    $q_pk = mysqli_query($koneksi, "
+        SELECT COUNT(*) as pk_count 
+        FROM information_schema.KEY_COLUMN_USAGE 
+        WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'perkiraan_biaya_ranap' 
+          AND CONSTRAINT_NAME = 'PRIMARY'
+    ");
+    $is_multiple = false;
+    if ($q_pk && $r_pk = mysqli_fetch_assoc($q_pk)) {
+        if ((int)$r_pk['pk_count'] > 1) {
+            $is_multiple = true;
         }
     }
-}
 
-// Juga pastikan kolom kd_penyakit bisa menerima input bebas (varchar 15 biasanya sudah cukup, tapi kita hilangkan restriksi integritasnya)
-// Query di atas sudah cukup untuk melepas constraint.
-
-if ($found > 0) {
-    echo json_encode(['status' => 'success', 'message' => "Berhasil melepas $found constraint penyakit. Sekarang Anda bisa memasukkan kode grouper manual."]);
-} else {
-    if (empty($errors)) {
-        echo json_encode(['status' => 'info', 'message' => "Tidak ditemukan constraint penyakit pada tabel perkiraan_biaya_ranap. Tabel sudah siap digunakan."]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => "Gagal melepas constraint: " . implode(", ", $errors)]);
+    if ($is_multiple) {
+        echo json_encode(['status' => 'info', 'message' => 'Tabel perkiraan_biaya_ranap sudah menggunakan composite primary key (Multiple ICD aktif).']);
+        exit;
     }
+
+    // 2. Alter table to composite primary key
+    $sql_alter = "ALTER TABLE perkiraan_biaya_ranap DROP PRIMARY KEY, ADD PRIMARY KEY (no_rawat, kd_penyakit)";
+    if (mysqli_query($koneksi, $sql_alter)) {
+        echo json_encode(['status' => 'success', 'message' => 'Berhasil mengubah schema tabel ke Multiple ICD (Composite PK).']);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Gagal mengubah schema tabel: ' . mysqli_error($koneksi)]);
+    }
+} elseif ($action === 'rollback') {
+    // 1. Check if it is a composite PK
+    $q_pk = mysqli_query($koneksi, "
+        SELECT COUNT(*) as pk_count 
+        FROM information_schema.KEY_COLUMN_USAGE 
+        WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'perkiraan_biaya_ranap' 
+          AND CONSTRAINT_NAME = 'PRIMARY'
+    ");
+    $is_multiple = false;
+    if ($q_pk && $r_pk = mysqli_fetch_assoc($q_pk)) {
+        if ((int)$r_pk['pk_count'] > 1) {
+            $is_multiple = true;
+        }
+    }
+
+    if (!$is_multiple) {
+        echo json_encode(['status' => 'info', 'message' => 'Tabel perkiraan_biaya_ranap sudah menggunakan single primary key (Single ICD aktif).']);
+        exit;
+    }
+
+    // 2. Clean up duplicates keeping the first one (lexicographically smallest kd_penyakit)
+    mysqli_query($koneksi, "SET FOREIGN_KEY_CHECKS = 0");
+    $sql_clean = "
+        DELETE p1 FROM perkiraan_biaya_ranap p1
+        INNER JOIN perkiraan_biaya_ranap p2 
+        ON p1.no_rawat = p2.no_rawat AND p1.kd_penyakit > p2.kd_penyakit
+    ";
+    mysqli_query($koneksi, $sql_clean);
+
+    // 3. Revert table to single primary key
+    $sql_alter = "ALTER TABLE perkiraan_biaya_ranap DROP PRIMARY KEY, ADD PRIMARY KEY (no_rawat)";
+    $success = mysqli_query($koneksi, $sql_alter);
+    $err = mysqli_error($koneksi);
+    mysqli_query($koneksi, "SET FOREIGN_KEY_CHECKS = 1");
+
+    if ($success) {
+        echo json_encode(['status' => 'success', 'message' => 'Berhasil mengembalikan schema tabel ke Single ICD (Single PK) dan membersihkan data duplikat.']);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Gagal mengembalikan schema tabel: ' . $err]);
+    }
+} else {
+    echo json_encode(['status' => 'error', 'message' => 'Action tidak dikenali.']);
 }
 
 mysqli_close($koneksi);

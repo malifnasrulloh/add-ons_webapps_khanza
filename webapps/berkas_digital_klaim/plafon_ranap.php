@@ -51,6 +51,21 @@ $q_su = safe_query($koneksi, "SELECT * FROM set_service_ranap LIMIT 1");
 if($q_su) $service_umum = mysqli_fetch_assoc($q_su);
 $q_sp = safe_query($koneksi, "SELECT * FROM set_service_ranap_piutang LIMIT 1");
 if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
+
+// Check if Multiple ICD (Composite Primary Key) schema is active
+$is_multiple_icd = false;
+$q_pk = mysqli_query($koneksi, "
+    SELECT COUNT(*) as pk_count 
+    FROM information_schema.KEY_COLUMN_USAGE 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'perkiraan_biaya_ranap' 
+      AND CONSTRAINT_NAME = 'PRIMARY'
+");
+if ($q_pk && $r_pk = mysqli_fetch_assoc($q_pk)) {
+    if ((int)$r_pk['pk_count'] > 1) {
+        $is_multiple_icd = true;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -122,9 +137,15 @@ if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fw-bold text-primary"><i class="fas fa-hand-holding-usd me-2"></i>Monitoring Profit/Loss (BPJS Ranap)</h5>
                     <?php if (isset($_SESSION['casemix_role']) && $_SESSION['casemix_role'] === 'Super Admin'): ?>
-                        <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="fixSchema()">
-                            <i class="fas fa-tools me-1"></i> Fix Table Constraint
-                        </button>
+                        <?php if ($is_multiple_icd): ?>
+                            <button type="button" class="btn btn-danger btn-sm fw-bold" onclick="rollbackSchema()">
+                                <i class="fas fa-undo me-1"></i> Revert Single ICD
+                            </button>
+                        <?php else: ?>
+                            <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="fixSchema()">
+                                <i class="fas fa-tools me-1"></i> Enable Multiple ICDs
+                            </button>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
                 <div class="card-body">
@@ -150,9 +171,8 @@ if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
                                     pasien.nm_pasien, 
                                     reg_periksa.biaya_reg,
                                     reg_periksa.kd_pj,
-                                    perkiraan_biaya_ranap.kd_penyakit, 
-                                    penyakit.nm_penyakit,
-                                    perkiraan_biaya_ranap.tarif AS tarif_INACBG,
+                                    GROUP_CONCAT(CONCAT(perkiraan_biaya_ranap.kd_penyakit, '::', penyakit.nm_penyakit) SEPARATOR '||') AS penyakit_list,
+                                    MAX(perkiraan_biaya_ranap.tarif) AS tarif_INACBG,
                                     pegawai.nama as dpjp_nama
                                 FROM reg_periksa
                                 LEFT JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
@@ -320,6 +340,20 @@ if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
                                     $selisih = $row['selisih_raw'];
                                     $warna_selisih = ($selisih < 0) ? 'text-danger fw-bold' : 'text-success fw-bold';
                                     $id_select = str_replace(['/','\\'], '-', $row['no_rawat']); // ID aman untuk JS
+
+                                    $penyakit_arr = [];
+                                    if (!empty($row['penyakit_list'])) {
+                                        $items = explode('||', $row['penyakit_list']);
+                                        foreach ($items as $item) {
+                                            $parts = explode('::', $item);
+                                            if (count($parts) === 2 && !empty($parts[0])) {
+                                                $penyakit_arr[] = [
+                                                    'kd' => $parts[0],
+                                                    'nm' => $parts[1]
+                                                ];
+                                            }
+                                        }
+                                    }
                                 ?>
                                 <tr>
                                     <td><?= $row['no_rawat'] ?></td>
@@ -327,10 +361,10 @@ if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
                                     <td><?= $row['nm_pasien'] ?></td>
                                     <td>
                                         <div class="input-group input-group-sm">
-                                            <select class="form-select form-select-sm select2-icd" id="kode_<?= $id_select ?>">
-                                                <?php if(!empty($row['kd_penyakit'])): ?>
-                                                    <option value="<?= htmlspecialchars($row['kd_penyakit']) ?>" selected><?= htmlspecialchars($row['kd_penyakit']) ?> - <?= htmlspecialchars($row['nm_penyakit']) ?></option>
-                                                <?php endif; ?>
+                                            <select class="form-select form-select-sm select2-icd" id="kode_<?= $id_select ?>" <?= $is_multiple_icd ? 'multiple="multiple"' : '' ?>>
+                                                <?php foreach ($penyakit_arr as $p): ?>
+                                                    <option value="<?= htmlspecialchars($p['kd']) ?>" selected><?= htmlspecialchars($p['kd']) ?> - <?= htmlspecialchars($p['nm']) ?></option>
+                                                <?php endforeach; ?>
                                             </select>
                                             <input type="number" class="form-control form-control-sm" placeholder="Nominal" 
                                                    id="tarif_<?= $id_select ?>" value="<?= $row['tarif_INACBG'] ?>">
@@ -368,22 +402,55 @@ if($q_sp) $service_piutang = mysqli_fetch_assoc($q_sp);
 
     function fixSchema() {
         Swal.fire({
-            title: 'Fix Table Schema?',
-            text: "Ini akan melepas constraint kd_penyakit agar Anda bisa input bebas.",
+            title: 'Aktifkan Multiple ICD?',
+            text: "Ini akan mengubah primary key tabel menjadi composite agar Anda dapat menginput beberapa ICD per pasien.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#f39c12',
-            confirmButtonText: 'Ya, Jalankan!'
+            confirmButtonText: 'Ya, Aktifkan!'
         }).then((result) => {
             if (result.isConfirmed) {
                 var csrfToken = $('meta[name="csrf-token"]').attr('content');
                 $.ajax({
                     url: 'api/fix_schema.php',
                     method: 'POST',
-                    data: { csrf_token: csrfToken },
+                    data: { action: 'apply', csrf_token: csrfToken },
                     dataType: 'json',
                     success: function(resp) {
-                        Swal.fire(resp.status === 'error' ? 'Gagal' : 'Berhasil', resp.message, resp.status);
+                        Swal.fire(resp.status === 'error' ? 'Gagal' : 'Berhasil', resp.message, resp.status).then(() => {
+                            if (resp.status !== 'error') location.reload();
+                        });
+                    },
+                    error: function(xhr, status, error) { 
+                        var msg = 'Gagal menghubungi server.';
+                        if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                        Swal.fire('Error', msg, 'error'); 
+                    }
+                });
+            }
+        });
+    }
+
+    function rollbackSchema() {
+        Swal.fire({
+            title: 'Kembalikan ke Single ICD?',
+            text: "Ini akan mengembalikan primary key ke single (no_rawat). Jika ada pasien dengan beberapa ICD, hanya satu ICD pertama yang akan dipertahankan dan sisanya dihapus.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Ya, Kembalikan!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                var csrfToken = $('meta[name="csrf-token"]').attr('content');
+                $.ajax({
+                    url: 'api/fix_schema.php',
+                    method: 'POST',
+                    data: { action: 'rollback', csrf_token: csrfToken },
+                    dataType: 'json',
+                    success: function(resp) {
+                        Swal.fire(resp.status === 'error' ? 'Gagal' : 'Berhasil', resp.message, resp.status).then(() => {
+                            if (resp.status !== 'error') location.reload();
+                        });
                     },
                     error: function(xhr, status, error) { 
                         var msg = 'Gagal menghubungi server.';
