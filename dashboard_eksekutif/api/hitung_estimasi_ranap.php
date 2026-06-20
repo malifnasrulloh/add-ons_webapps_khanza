@@ -272,7 +272,7 @@ try {
     $plafon_val = 0;
     $has_plafon  = false;
     try {
-        $stmt = $koneksi_pdo->prepare("SELECT tarif FROM perkiraan_biaya_ranap WHERE no_rawat = :no_rawat LIMIT 1");
+        $stmt = $koneksi_pdo->prepare("SELECT MAX(tarif) as tarif FROM perkiraan_biaya_ranap WHERE no_rawat = :no_rawat");
         $stmt->execute([':no_rawat' => $no_rawat]);
         if ($r_plafon = $stmt->fetch(PDO::FETCH_ASSOC)) {
             if (!is_null($r_plafon['tarif']) && $r_plafon['tarif'] !== '') {
