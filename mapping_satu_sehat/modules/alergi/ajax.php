@@ -131,7 +131,12 @@ try {
         if ($apiData['status'] === 'success') {
             echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
         } else {
-            echo json_encode(['results' => [], 'source' => 'error', 'pagination' => ['more' => false]]);
+            echo json_encode([
+                'results' => [], 
+                'source' => 'error', 
+                'pagination' => ['more' => false],
+                'debug' => $apiData['debug'] ?? null
+            ]);
         }
         exit;
     }

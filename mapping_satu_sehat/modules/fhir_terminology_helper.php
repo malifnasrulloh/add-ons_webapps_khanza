@@ -32,7 +32,7 @@ function fhir_search_snomed($keyword, $ecl = null) {
         $vs_url .= '=ecl/' . urlencode($ecl);
     }
     
-    $url .= '?url=' . $vs_url
+    $url .= '?url=' . urlencode($vs_url)
          . '&filter=' . urlencode($keyword)
          . '&count=50'; // Ambil hingga 50 untuk sinkronisasi dengan pagination lokal
 
@@ -40,7 +40,9 @@ function fhir_search_snomed($keyword, $ecl = null) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 12);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Accept: application/json',
         'Cache-Control: no-cache'
@@ -70,7 +72,13 @@ function fhir_search_snomed($keyword, $ecl = null) {
         'status'  => ($http_code === 200 && count($results) > 0) ? 'success' : 'error',
         'source'  => 'api',
         'results' => $results,
-        'debug'   => $curl_err ?: null
+        'debug'   => [
+            'http_code' => $http_code,
+            'curl_error' => $curl_err ?: null,
+            'url' => $url,
+            'response_empty' => empty($response),
+            'response_preview' => $response ? substr($response, 0, 300) : null
+        ]
     ];
 }
 
@@ -91,7 +99,8 @@ function fhir_search_loinc($keyword) {
             'status' => 'error',
             'message' => 'Credential LOINC belum diatur di Super Admin.',
             'source' => 'api',
-            'results' => []
+            'results' => [],
+            'debug' => ['message' => 'LOINC credentials empty']
         ];
     }
 
@@ -99,15 +108,21 @@ function fhir_search_loinc($keyword) {
     
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 12);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     // Basic Auth
     curl_setopt($ch, CURLOPT_USERPWD, $loincUser . ":" . $loincPass);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Accept: application/json'
+        'Accept: application/json',
+        'Cache-Control: no-cache'
     ]);
     
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_err  = curl_error($ch);
     curl_close($ch);
     
     $results = [];
@@ -126,8 +141,15 @@ function fhir_search_loinc($keyword) {
     }
     
     return [
-        'status' => $http_code === 200 ? 'success' : 'error',
+        'status' => ($http_code === 200 && count($results) > 0) ? 'success' : 'error',
         'source' => 'api',
-        'results' => $results
+        'results' => $results,
+        'debug'   => [
+            'http_code' => $http_code,
+            'curl_error' => $curl_err ?: null,
+            'url' => $url,
+            'response_empty' => empty($response),
+            'response_preview' => $response ? substr($response, 0, 300) : null
+        ]
     ];
 }

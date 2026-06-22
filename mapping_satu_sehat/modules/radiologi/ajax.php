@@ -130,12 +130,14 @@ try {
         $searchMode = ($cred && !empty($cred['kfa_search_mode'])) ? $cred['kfa_search_mode'] : 'database';
         
         $isFallback = false;
+        $apiDebug = null;
         if ($searchMode === 'api') {
             $apiData = fhir_search_loinc($q);
             if ($apiData['status'] === 'success') {
                 echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
                 exit;
             }
+            $apiDebug = $apiData['debug'] ?? null;
             $isFallback = true;
         }
 
@@ -165,10 +167,23 @@ try {
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fallback to API if DB search is empty in database mode
+        if (empty($results) && $searchMode === 'database') {
+            $apiData = fhir_search_loinc($q);
+            if ($apiData['status'] === 'success') {
+                echo json_encode(['results' => $apiData['results'], 'source' => 'api-fallback', 'pagination' => ['more' => false]]);
+                exit;
+            }
+            $apiDebug = $apiData['debug'] ?? null;
+        }
+        
         echo json_encode([
-            'results' => $stmt->fetchAll(PDO::FETCH_ASSOC), 
+            'results' => $results, 
             'source' => $isFallback ? 'fallback' : 'database',
-            'pagination' => ['more' => $more]
+            'pagination' => ['more' => $more],
+            'debug' => $apiDebug
         ]);
         exit;
     }
@@ -185,6 +200,7 @@ try {
         $searchMode = ($cred && !empty($cred['kfa_search_mode'])) ? $cred['kfa_search_mode'] : 'database';
         
         $isFallback = false;
+        $apiDebug = null;
         if ($searchMode === 'api') {
             // ECL <<123037004 membatasi pencarian hanya pada descendant dari "Body structure"
             $apiData = fhir_search_snomed($q);
@@ -192,6 +208,7 @@ try {
                 echo json_encode(['results' => $apiData['results'], 'source' => 'api', 'pagination' => ['more' => false]]);
                 exit;
             }
+            $apiDebug = $apiData['debug'] ?? null;
             $isFallback = true;
         }
 
@@ -219,10 +236,23 @@ try {
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fallback to API if DB search is empty in database mode
+        if (empty($results) && $searchMode === 'database') {
+            $apiData = fhir_search_snomed($q);
+            if ($apiData['status'] === 'success') {
+                echo json_encode(['results' => $apiData['results'], 'source' => 'api-fallback', 'pagination' => ['more' => false]]);
+                exit;
+            }
+            $apiDebug = $apiData['debug'] ?? null;
+        }
+        
         echo json_encode([
-            'results' => $stmt->fetchAll(PDO::FETCH_ASSOC), 
+            'results' => $results, 
             'source' => $isFallback ? 'fallback' : 'database',
-            'pagination' => ['more' => $more]
+            'pagination' => ['more' => $more],
+            'debug' => $apiDebug
         ]);
         exit;
     }
