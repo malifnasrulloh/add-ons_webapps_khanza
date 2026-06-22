@@ -159,24 +159,57 @@ try {
         $limit = 50;
         $offset = ($page - 1) * $limit;
 
+        // Tokenize query for multi-word search
+        $words = array_filter(explode(' ', $q));
+        $params = [];
+        $whereClauses = [];
+        if (!empty($words)) {
+            $nameConditions = [];
+            $i = 0;
+            foreach ($words as $word) {
+                $paramName = ":word_" . $i;
+                $nameConditions[] = "long_common_name LIKE $paramName";
+                $params[$paramName] = "%$word%";
+                $i++;
+            }
+            $whereClauses[] = "(" . implode(" AND ", $nameConditions) . ") OR loinc_num = :exact_code";
+            $params[':exact_code'] = $q;
+        } else {
+            $whereClauses[] = "long_common_name LIKE :q OR loinc_num = :q";
+            $params[':q'] = "%$q%";
+        }
+        $whereSql = implode(" AND ", $whereClauses);
+
         // Count total for pagination
-        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_loinc WHERE long_common_name LIKE :q OR loinc_num LIKE :q");
-        $stmtCount->execute([':q' => "%$q%"]);
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_loinc WHERE $whereSql");
+        $stmtCount->execute($params);
         $total = $stmtCount->fetchColumn();
         $more = ($offset + $limit) < $total;
+
+        $firstWord = reset($words) ?: '';
 
         $stmt = $pdo->prepare("
             SELECT loinc_num as id, CONCAT(loinc_num,' - ',long_common_name) as text, long_common_name as display, 
                    system_type, method_typ, property, class, shortname 
             FROM satu_sehat_ref_loinc 
-            WHERE long_common_name LIKE :q OR loinc_num LIKE :q 
+            WHERE $whereSql 
             ORDER BY 
-                CASE WHEN loinc_num = :exact THEN 0 ELSE 1 END,
+                CASE 
+                    WHEN loinc_num = :exact THEN 0 
+                    WHEN long_common_name LIKE :startsWithQuery THEN 1
+                    WHEN long_common_name LIKE :startsWithFirstWord THEN 2
+                    ELSE 3 
+                END,
                 long_common_name ASC 
             LIMIT :limit OFFSET :offset
         ");
+        
+        foreach ($params as $paramName => $paramValue) {
+            $stmt->bindValue($paramName, $paramValue);
+        }
         $stmt->bindValue(':exact', $q);
-        $stmt->bindValue(':q', "%$q%");
+        $stmt->bindValue(':startsWithQuery', $q . '%');
+        $stmt->bindValue(':startsWithFirstWord', $firstWord . '%');
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -230,22 +263,55 @@ try {
         $limit = 50;
         $offset = ($page - 1) * $limit;
 
-        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_snomed WHERE term LIKE :q OR conceptId LIKE :q");
-        $stmtCount->execute([':q' => "%$q%"]);
+        // Tokenize query for multi-word search
+        $words = array_filter(explode(' ', $q));
+        $params = [];
+        $whereClauses = [];
+        if (!empty($words)) {
+            $nameConditions = [];
+            $i = 0;
+            foreach ($words as $word) {
+                $paramName = ":word_" . $i;
+                $nameConditions[] = "term LIKE $paramName";
+                $params[$paramName] = "%$word%";
+                $i++;
+            }
+            $whereClauses[] = "(" . implode(" AND ", $nameConditions) . ") OR conceptId = :exact_code";
+            $params[':exact_code'] = $q;
+        } else {
+            $whereClauses[] = "term LIKE :q OR conceptId = :q";
+            $params[':q'] = "%$q%";
+        }
+        $whereSql = implode(" AND ", $whereClauses);
+
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM satu_sehat_ref_snomed WHERE $whereSql");
+        $stmtCount->execute($params);
         $total = $stmtCount->fetchColumn();
         $more = ($offset + $limit) < $total;
+
+        $firstWord = reset($words) ?: '';
 
         $stmt = $pdo->prepare("
             SELECT conceptId as id, CONCAT(conceptId,' - ',term) as text, term as display 
             FROM satu_sehat_ref_snomed 
-            WHERE term LIKE :q OR conceptId LIKE :q 
+            WHERE $whereSql 
             ORDER BY 
-                CASE WHEN conceptId = :exact THEN 0 ELSE 1 END,
+                CASE 
+                    WHEN conceptId = :exact THEN 0 
+                    WHEN term LIKE :startsWithQuery THEN 1
+                    WHEN term LIKE :startsWithFirstWord THEN 2
+                    ELSE 3 
+                END,
                 term ASC 
             LIMIT :limit OFFSET :offset
         ");
+        
+        foreach ($params as $paramName => $paramValue) {
+            $stmt->bindValue($paramName, $paramValue);
+        }
         $stmt->bindValue(':exact', $q);
-        $stmt->bindValue(':q', "%$q%");
+        $stmt->bindValue(':startsWithQuery', $q . '%');
+        $stmt->bindValue(':startsWithFirstWord', $firstWord . '%');
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();

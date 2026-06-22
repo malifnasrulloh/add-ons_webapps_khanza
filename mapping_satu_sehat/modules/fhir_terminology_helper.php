@@ -65,6 +65,7 @@ function fhir_search_snomed($keyword, $ecl = null) {
                     'system'  => $item['system'] ?? 'http://snomed.info/sct'
                 ];
             }
+            $results = fhir_sort_results($results, $keyword);
         }
     }
 
@@ -137,6 +138,7 @@ function fhir_search_loinc($keyword) {
                     'system' => $item['system']
                 ];
             }
+            $results = fhir_sort_results($results, $keyword);
         }
     }
     
@@ -152,4 +154,47 @@ function fhir_search_loinc($keyword) {
             'response_preview' => $response ? substr($response, 0, 300) : null
         ]
     ];
+}
+
+/**
+ * Mengurutkan hasil pencarian berdasarkan relevansi kata kunci.
+ * 1. Cocok kode persis (exact code match)
+ * 2. Teks diawali oleh query lengkap
+ * 3. Teks diawali oleh kata pertama query
+ * 4. Alfabetis
+ */
+function fhir_sort_results($results, $query) {
+    $q = strtolower(trim($query));
+    if ($q === '') return $results;
+    
+    $words = array_filter(explode(' ', $q));
+    $firstWord = reset($words) ?: '';
+    
+    usort($results, function($a, $b) use ($q, $firstWord) {
+        $aId = strtolower($a['id']);
+        $bId = strtolower($b['id']);
+        if ($aId === $q && $bId !== $q) return -1;
+        if ($bId === $q && $aId !== $q) return 1;
+        
+        $aDisplay = strtolower($a['display']);
+        $bDisplay = strtolower($b['display']);
+        
+        $aStartsWithQuery = (strpos($aDisplay, $q) === 0);
+        $bStartsWithQuery = (strpos($bDisplay, $q) === 0);
+        
+        if ($aStartsWithQuery && !$bStartsWithQuery) return -1;
+        if ($bStartsWithQuery && !$aStartsWithQuery) return 1;
+        
+        if ($firstWord !== '') {
+            $aStartsWithFirstWord = (strpos($aDisplay, $firstWord) === 0);
+            $bStartsWithFirstWord = (strpos($bDisplay, $firstWord) === 0);
+            
+            if ($aStartsWithFirstWord && !$bStartsWithFirstWord) return -1;
+            if ($bStartsWithFirstWord && !$aStartsWithFirstWord) return 1;
+        }
+        
+        return strcasecmp($a['display'], $b['display']);
+    });
+    
+    return $results;
 }
