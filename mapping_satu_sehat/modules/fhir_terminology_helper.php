@@ -90,8 +90,9 @@ function fhir_search_snomed($keyword, $ecl = null) {
  * @return array Array results untuk select2
  */
 function fhir_search_loinc($keyword) {
-    // Gunakan NIH/NLM Clinical Tables Search Service (Public, No Auth)
-    $url = "https://clinicaltables.nlm.nih.gov/fhir/R4/ValueSet/loinc-items/\$expand?count=30&filter=" . urlencode($keyword);
+    // Gunakan NIH/NLM Clinical Tables Search Service raw search API (Public, No Auth)
+    // untuk mengambil display lengkap (LONG_COMMON_NAME) beserta metadata (METHOD_TYP, PROPERTY, SHORTNAME)
+    $url = "https://clinicaltables.nlm.nih.gov/api/loinc_items/v3/search?terms=" . urlencode($keyword) . "&max=30&ef=LONG_COMMON_NAME,METHOD_TYP,PROPERTY,SHORTNAME";
     
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -113,13 +114,32 @@ function fhir_search_loinc($keyword) {
     $results = [];
     if ($http_code === 200 && $response) {
         $data = json_decode($response, true);
-        if (isset($data['expansion']['contains'])) {
-            foreach ($data['expansion']['contains'] as $item) {
+        if (is_array($data) && count($data) >= 3) {
+            $codes = $data[1];
+            $ef = $data[2];
+            
+            $longCommonNames = $ef['LONG_COMMON_NAME'] ?? [];
+            $methods = $ef['METHOD_TYP'] ?? [];
+            $properties = $ef['PROPERTY'] ?? [];
+            $shortnames = $ef['SHORTNAME'] ?? [];
+            
+            foreach ($codes as $index => $code) {
+                // Gunakan LONG_COMMON_NAME, fallback ke default display
+                $display = $longCommonNames[$index] ?? '';
+                if (empty($display) && isset($data[3][$index][0])) {
+                    $display = $data[3][$index][0];
+                }
+                
                 $results[] = [
-                    'id' => $item['code'],
-                    'text' => $item['code'] . ' - ' . $item['display'],
-                    'display' => $item['display'],
-                    'system' => $item['system'] ?? 'http://loinc.org'
+                    'id' => $code,
+                    'text' => $code . ' - ' . $display,
+                    'display' => $display,
+                    'system_type' => '', // NLM tidak menyediakan field ini secara terpisah
+                    'method_typ' => $methods[$index] ?? '',
+                    'property' => $properties[$index] ?? '',
+                    'class' => '', // NLM tidak menyediakan field ini secara terpisah
+                    'shortname' => $shortnames[$index] ?? '',
+                    'system' => 'http://loinc.org'
                 ];
             }
             $results = fhir_sort_results($results, $keyword);
