@@ -118,9 +118,14 @@ $tabs = [
                     <div>
                         <small class="text-muted">System: <span id="systemLabel" class="fw-semibold" style="color:#4f46e5"><?= $tabs['kfa']['system'] ?></span></small>
                     </div>
-                    <button class="btn btn-sm btn-primary" id="btnTambah">
-                        <i class="fa fa-plus me-1"></i> Tambah Entri Baru
-                    </button>
+                    <div>
+                        <button class="btn btn-sm btn-outline-success me-2" id="btnImportLoinc" style="display:none;">
+                            <i class="fa fa-file-import me-1"></i> Update DB dari CSV
+                        </button>
+                        <button class="btn btn-sm btn-primary" id="btnTambah">
+                            <i class="fa fa-plus me-1"></i> Tambah Entri Baru
+                        </button>
+                    </div>
                 </div>
                 <div class="mt-2">
                     <div class="input-group input-group-sm" style="max-width:400px">
@@ -167,6 +172,93 @@ $tabs = [
                 <button type="button" class="btn btn-primary" id="btnSimpan">
                     <i class="fa fa-save me-1"></i> Simpan
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Import LOINC -->
+<div class="modal fade" id="modalImport" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header text-white bg-success">
+                <h5 class="modal-title"><i class="fa fa-file-import me-2"></i>Update LOINC Database dari CSV</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" id="btnImportCloseX"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Section 1: Upload File -->
+                <div id="importUploadSec">
+                    <div class="p-5 border border-2 border-success rounded-3 text-center bg-light" id="dropZone" style="cursor: pointer; border-style: dashed !important;">
+                        <i class="fa-solid fa-cloud-arrow-up fa-3x text-success mb-3"></i>
+                        <h5>Pilih atau Jatuhkan File LOINC CSV</h5>
+                        <p class="text-muted small">Mendukung format file `.csv` atau `.txt`. File LOINC biasanya berukuran besar. Proses update akan dilakukan secara bertahap (chunked) untuk menghindari timeout.</p>
+                        <input type="file" id="importFile" class="d-none" accept=".csv,.txt">
+                        <button class="btn btn-success btn-sm mt-2" onclick="document.getElementById('importFile').click()"><i class="fa fa-folder-open me-1"></i> Pilih File</button>
+                    </div>
+                </div>
+
+                <!-- Section 2: Mapping Confirmation -->
+                <div id="importConfirmSec" style="display:none;">
+                    <div class="alert alert-info py-2">
+                        <i class="fa-solid fa-circle-info me-2"></i> File berhasil diunggah. Silakan tinjau pemetaan kolom di bawah ini sebelum memulai proses.
+                    </div>
+                    <div class="card mb-3">
+                        <div class="card-header bg-light py-2 fw-semibold">Detail File & Deteksi Kolom</div>
+                        <div class="card-body py-2">
+                            <table class="table table-sm table-borderless mb-0 small">
+                                <tr>
+                                    <td width="30%" class="text-muted">Ukuran File:</td>
+                                    <td id="infoFileSize" class="fw-bold">-</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Status Mapping:</td>
+                                    <td id="infoMappingStatus" class="text-success fw-bold">Otomatis Terdeteksi <i class="fa fa-check-circle"></i></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header bg-light py-2 fw-semibold">Pemetaan Kolom CSV -> Database</div>
+                        <div class="card-body py-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped mb-0 small" id="tableMappingReview">
+                                    <thead>
+                                        <tr>
+                                            <th>Kolom Target DB</th>
+                                            <th>Kolom CSV Terdeteksi</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dynamic mapping list by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="button" class="btn btn-secondary btn-sm me-2" id="btnResetImport"><i class="fa fa-arrow-left"></i> Ganti File</button>
+                        <button type="button" class="btn btn-success btn-sm" id="btnStartImport"><i class="fa fa-play"></i> Mulai Proses Import</button>
+                    </div>
+                </div>
+
+                <!-- Section 3: Progress Bar -->
+                <div id="importProgressSec" style="display:none;">
+                    <h6 class="fw-bold mb-2 text-center" id="progressStatus">Sedang mempersiapkan database...</h6>
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%" id="importProgressBar">0%</div>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted small mb-3">
+                        <span id="progressProcessedRows">Terkirim: 0 baris</span>
+                        <span id="progressSpeed">- bytes/detik</span>
+                    </div>
+                    <div class="alert alert-warning py-2 text-center small mb-0">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i> Jangan menutup halaman atau mematikan server selama proses import berlangsung.
+                    </div>
+                    <div class="d-flex justify-content-center mt-3">
+                        <button type="button" class="btn btn-danger btn-sm px-4" id="btnCancelImport"><i class="fa fa-stop"></i> Batalkan & Hentikan</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -292,6 +384,12 @@ $(function() {
         $('#tableWrapper').hide();
         $('#lazyPlaceholder').show();
         if (dtInit) { dtTable.destroy(); dtInit = false; }
+
+        if (currentTbl === 'loinc') {
+            $('#btnImportLoinc').show();
+        } else {
+            $('#btnImportLoinc').hide();
+        }
     });
 
     // Tampilkan / search
@@ -390,6 +488,265 @@ $(function() {
             btn.html(orig).prop('disabled', false);
             Swal.fire('Error!', 'Koneksi server gagal.', 'error');
         });
+    });
+
+    // ============================================================
+    // LOINC CSV IMPORT JS
+    // ============================================================
+    let importFileObj = null;
+    let importOffset = 0;
+    let importTotalBytes = 0;
+    let importTotalImported = 0;
+    let importStartTime = 0;
+    let importCancelled = false;
+
+    const modalImport = new bootstrap.Modal(document.getElementById('modalImport'));
+
+    $('#btnImportLoinc').on('click', function() {
+        resetImportUI();
+        modalImport.show();
+    });
+
+    function resetImportUI() {
+        importFileObj = null;
+        importOffset = 0;
+        importTotalBytes = 0;
+        importTotalImported = 0;
+        importCancelled = false;
+        $('#importFile').val('');
+        $('#importUploadSec').show();
+        $('#importConfirmSec').hide();
+        $('#importProgressSec').hide();
+        $('#importProgressBar').css('width', '0%').text('0%').removeClass('bg-danger bg-warning').addClass('bg-success');
+    }
+
+    // Drag & Drop
+    const dropZone = $('#dropZone');
+    dropZone.on('dragover', function(e) {
+        e.preventDefault();
+        dropZone.addClass('border-success bg-light text-success');
+    });
+    dropZone.on('dragleave', function(e) {
+        e.preventDefault();
+        dropZone.removeClass('border-success bg-light text-success');
+    });
+    dropZone.on('drop', function(e) {
+        e.preventDefault();
+        dropZone.removeClass('border-success bg-light text-success');
+        const files = e.originalEvent.dataTransfer.files;
+        if (files.length > 0) {
+            handleSelectedFile(files[0]);
+        }
+    });
+
+    $('#importFile').on('change', function() {
+        if (this.files.length > 0) {
+            handleSelectedFile(this.files[0]);
+        }
+    });
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = 2;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    function handleSelectedFile(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext !== 'csv' && ext !== 'txt') {
+            Swal.fire('Error', 'Format file tidak didukung. Pilih file CSV atau TXT.', 'error');
+            return;
+        }
+
+        // Upload file
+        Swal.fire({
+            title: 'Mengunggah File',
+            text: 'Harap tunggu, server sedang membaca header file...',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+
+        const formData = new FormData();
+        formData.append('csv_file', file);
+        formData.append('csrf_token', CSRF_TOKEN);
+
+        $.ajax({
+            url: 'ajax.php?action=upload_loinc_csv',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(r) {
+                Swal.close();
+                if (r.status === 'success') {
+                    importFileObj = file;
+                    importTotalBytes = r.file_size;
+                    
+                    $('#infoFileSize').text(formatBytes(r.file_size));
+                    
+                    // Render mapping review
+                    let html = '';
+                    const dbCols = {
+                        'loinc_num': { label: 'loinc_num (Kode LOINC)', req: true },
+                        'component': { label: 'component', req: false },
+                        'long_common_name': { label: 'long_common_name (Nama Panjang)', req: false },
+                        'system_type': { label: 'system_type', req: false },
+                        'method_typ': { label: 'method_typ', req: false },
+                        'property': { label: 'property', req: false },
+                        'class': { label: 'class', req: false },
+                        'shortname': { label: 'shortname', req: false }
+                    };
+
+                    $.each(dbCols, function(col, info) {
+                        const csvCol = r.col_map[col];
+                        let statusBadge = '';
+                        if (csvCol) {
+                            statusBadge = '<span class="badge bg-success"><i class="fa fa-check"></i> Terpetakan</span>';
+                        } else {
+                            statusBadge = info.req 
+                                ? '<span class="badge bg-danger"><i class="fa fa-times"></i> Wajib Ada</span>' 
+                                : '<span class="badge bg-warning text-dark"><i class="fa fa-info-circle"></i> Dilewati</span>';
+                        }
+                        html += `<tr>
+                            <td class="font-monospace fw-bold">${escH(info.label)}</td>
+                            <td class="font-monospace">${csvCol ? escH(csvCol) : '<em class="text-muted">(Tidak Ditemukan)</em>'}</td>
+                            <td class="text-center">${statusBadge}</td>
+                        </tr>`;
+                    });
+
+                    $('#tableMappingReview tbody').html(html);
+                    $('#importUploadSec').hide();
+                    $('#importConfirmSec').show();
+                } else {
+                    Swal.fire('Gagal', r.message, 'error');
+                }
+            },
+            error: function() {
+                Swal.close();
+                Swal.fire('Error', 'Gagal menghubungi server.', 'error');
+            }
+        });
+    }
+
+    $('#btnResetImport').on('click', function() {
+        $.post('ajax.php?action=cancel_loinc_import', { csrf_token: CSRF_TOKEN }, function() {
+            resetImportUI();
+        });
+    });
+
+    $('#btnStartImport').on('click', function() {
+        $('#importConfirmSec').hide();
+        $('#importProgressSec').show();
+        
+        importOffset = 0;
+        importTotalImported = 0;
+        importCancelled = false;
+        importStartTime = Date.now();
+
+        $('#progressStatus').text('Memulai pemrosesan file...');
+        $('#importProgressBar').css('width', '0%').text('0%');
+        $('#progressProcessedRows').text('Terkirim: 0 baris');
+        $('#progressSpeed').text('0 bytes/detik');
+
+        doChunkImport();
+    });
+
+    function doChunkImport() {
+        if (importCancelled) {
+            return;
+        }
+
+        $.ajax({
+            url: 'ajax.php?action=import_loinc_chunk',
+            type: 'POST',
+            data: {
+                csrf_token: CSRF_TOKEN,
+                offset: importOffset
+            },
+            dataType: 'json',
+            success: function(r) {
+                if (importCancelled) return;
+
+                if (r.status === 'success') {
+                    importOffset = r.next_offset;
+                    importTotalImported += r.imported;
+
+                    // Update UI
+                    let pct = Math.floor((importOffset / importTotalBytes) * 100);
+                    if (pct > 100) pct = 100;
+                    $('#importProgressBar').css('width', pct + '%').text(pct + '%');
+                    $('#progressProcessedRows').text('Terkirim: ' + importTotalImported.toLocaleString() + ' baris (' + formatBytes(importOffset) + ')');
+
+                    // Hitung kecepatan
+                    const elapsed = (Date.now() - importStartTime) / 1000;
+                    if (elapsed > 0) {
+                        const speed = importOffset / elapsed;
+                        $('#progressSpeed').text(formatBytes(Math.round(speed)) + '/detik');
+                    }
+
+                    if (r.done) {
+                        modalImport.hide();
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Import Selesai!',
+                            html: `Berhasil mengimpor/memperbarui <strong>${importTotalImported.toLocaleString()}</strong> baris LOINC dari CSV ke database.`,
+                            confirmButtonText: 'Selesai'
+                        });
+                        if (dtInit) dtTable.ajax.reload(null, false);
+                    } else {
+                        $('#progressStatus').html(`<i class="fa fa-spinner fa-spin me-2"></i>Memproses baris database...`);
+                        setTimeout(doChunkImport, 50); // delay kecil agar UI responsif
+                    }
+                } else {
+                    $('#importProgressBar').removeClass('bg-success').addClass('bg-danger');
+                    $('#progressStatus').text('Error terjadi!');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Import Gagal',
+                        text: r.message,
+                        confirmButtonText: 'Tutup'
+                    });
+                }
+            },
+            error: function() {
+                if (importCancelled) return;
+                $('#importProgressBar').removeClass('bg-success').addClass('bg-warning text-dark');
+                $('#progressStatus').text('Koneksi terputus. Mencoba kembali dalam 5 detik...');
+                setTimeout(doChunkImport, 5000); // retry after 5s
+            }
+        });
+    }
+
+    // Cancel import
+    $('#btnCancelImport, #btnImportCloseX').on('click', function(e) {
+        if (importTotalImported > 0 && importOffset < importTotalBytes && !importCancelled) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            Swal.fire({
+                title: 'Hentikan Import?',
+                text: 'Proses import akan dihentikan. Data yang sudah masuk tidak akan dihapus.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Ya, Hentikan',
+                cancelButtonText: 'Lanjutkan'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    importCancelled = true;
+                    $.post('ajax.php?action=cancel_loinc_import', { csrf_token: CSRF_TOKEN }, function() {
+                        modalImport.hide();
+                        Swal.fire('Dihentikan', 'Proses import berhasil dihentikan.', 'info');
+                        if (dtInit) dtTable.ajax.reload(null, false);
+                    });
+                }
+            });
+        }
     });
 });
 
