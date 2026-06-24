@@ -90,22 +90,8 @@ function fhir_search_snomed($keyword, $ecl = null) {
  * @return array Array results untuk select2
  */
 function fhir_search_loinc($keyword) {
-    $cred = fhir_get_credential();
-    $loincUser = isset($cred['loinc_username']) ? $cred['loinc_username'] : '';
-    $loincPass = isset($cred['loinc_password']) ? $cred['loinc_password'] : '';
-    
-    // Jika tidak ada credential di-set, langsung kembalikan error (supaya lari ke fallback DB lokal)
-    if (empty($loincUser) || empty($loincPass)) {
-        return [
-            'status' => 'error',
-            'message' => 'Credential LOINC belum diatur di Super Admin.',
-            'source' => 'api',
-            'results' => [],
-            'debug' => ['message' => 'LOINC credentials empty']
-        ];
-    }
-
-    $url = "https://fhir.loinc.org/ValueSet/\$expand?url=http://loinc.org/vs&count=30&filter=" . urlencode($keyword);
+    // Gunakan NIH/NLM Clinical Tables Search Service (Public, No Auth)
+    $url = "https://clinicaltables.nlm.nih.gov/fhir/R4/ValueSet/loinc-items/\$expand?count=30&filter=" . urlencode($keyword);
     
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -114,8 +100,6 @@ function fhir_search_loinc($keyword) {
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    // Basic Auth
-    curl_setopt($ch, CURLOPT_USERPWD, $loincUser . ":" . $loincPass);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Accept: application/json',
         'Cache-Control: no-cache'
@@ -135,7 +119,7 @@ function fhir_search_loinc($keyword) {
                     'id' => $item['code'],
                     'text' => $item['code'] . ' - ' . $item['display'],
                     'display' => $item['display'],
-                    'system' => $item['system']
+                    'system' => $item['system'] ?? 'http://loinc.org'
                 ];
             }
             $results = fhir_sort_results($results, $keyword);
