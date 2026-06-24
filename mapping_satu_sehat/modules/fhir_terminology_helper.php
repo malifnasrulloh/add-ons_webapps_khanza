@@ -90,9 +90,22 @@ function fhir_search_snomed($keyword, $ecl = null) {
  * @return array Array results untuk select2
  */
 function fhir_search_loinc($keyword) {
-    // Gunakan NIH/NLM Clinical Tables Search Service raw search API (Public, No Auth)
-    // untuk mengambil display lengkap (LONG_COMMON_NAME) beserta metadata (METHOD_TYP, PROPERTY, SHORTNAME)
-    $url = "https://clinicaltables.nlm.nih.gov/api/loinc_items/v3/search?terms=" . urlencode($keyword) . "&max=30&ef=LONG_COMMON_NAME,METHOD_TYP,PROPERTY,SHORTNAME";
+    $cred = fhir_get_credential();
+    $loincUser = isset($cred['loinc_username']) ? $cred['loinc_username'] : '';
+    $loincPass = isset($cred['loinc_password']) ? $cred['loinc_password'] : '';
+    
+    // Jika tidak ada credential di-set, langsung kembalikan error (supaya lari ke fallback DB lokal)
+    if (empty($loincUser) || empty($loincPass)) {
+        return [
+            'status' => 'error',
+            'message' => 'Credential LOINC belum diatur di Super Admin.',
+            'source' => 'api',
+            'results' => [],
+            'debug' => ['message' => 'LOINC credentials empty']
+        ];
+    }
+
+    $url = "https://fhir.loinc.org/ValueSet/\$expand?url=http://loinc.org/vs&count=30&filter=" . urlencode($keyword);
     
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -101,6 +114,8 @@ function fhir_search_loinc($keyword) {
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    // Basic Auth
+    curl_setopt($ch, CURLOPT_USERPWD, $loincUser . ":" . $loincPass);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Accept: application/json',
         'Cache-Control: no-cache'
@@ -114,32 +129,18 @@ function fhir_search_loinc($keyword) {
     $results = [];
     if ($http_code === 200 && $response) {
         $data = json_decode($response, true);
-        if (is_array($data) && count($data) >= 3) {
-            $codes = $data[1];
-            $ef = $data[2];
-            
-            $longCommonNames = $ef['LONG_COMMON_NAME'] ?? [];
-            $methods = $ef['METHOD_TYP'] ?? [];
-            $properties = $ef['PROPERTY'] ?? [];
-            $shortnames = $ef['SHORTNAME'] ?? [];
-            
-            foreach ($codes as $index => $code) {
-                // Gunakan LONG_COMMON_NAME, fallback ke default display
-                $display = $longCommonNames[$index] ?? '';
-                if (empty($display) && isset($data[3][$index][0])) {
-                    $display = $data[3][$index][0];
-                }
-                
+        if (isset($data['expansion']['contains'])) {
+            foreach ($data['expansion']['contains'] as $item) {
                 $results[] = [
-                    'id' => $code,
-                    'text' => $code . ' - ' . $display,
-                    'display' => $display,
-                    'system_type' => '', // NLM tidak menyediakan field ini secara terpisah
-                    'method_typ' => $methods[$index] ?? '',
-                    'property' => $properties[$index] ?? '',
-                    'class' => '', // NLM tidak menyediakan field ini secara terpisah
-                    'shortname' => $shortnames[$index] ?? '',
-                    'system' => 'http://loinc.org'
+                    'id' => $item['code'],
+                    'text' => $item['code'] . ' - ' . $item['display'],
+                    'display' => $item['display'],
+                    'system_type' => '',
+                    'method_typ' => '',
+                    'property' => '',
+                    'class' => '',
+                    'shortname' => '',
+                    'system' => $item['system'] ?? 'http://loinc.org'
                 ];
             }
             $results = fhir_sort_results($results, $keyword);

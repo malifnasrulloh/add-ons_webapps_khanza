@@ -344,7 +344,7 @@ if (empty($_SESSION['is_admin'])) {
                 </div>
                 <div class="card-body p-4 text-center">
                     <p class="text-muted small mb-3">Kelola secara manual ribuan baris data master referensi KFA, LOINC, dan SNOMED-CT (CRUD).</p>
-                    <a href="../admin_ref/index.php" target="_blank" class="btn btn-outline-primary w-100 rounded-pill">
+                    <a href="../../admin_ref/index.php" target="_blank" class="btn btn-outline-primary w-100 rounded-pill">
                         <i class="fa fa-external-link-alt me-2"></i>Buka Admin Referensi
                     </a>
                 </div>
