@@ -79,7 +79,21 @@ if ($action === 'run_import') {
             // Create target mapping tables
             $tables = [
                 "CREATE TABLE IF NOT EXISTS `satu_sehat_mapping_obat` (
-                    `kode_brng` varchar(15) NOT NULL, `obat_code` varchar(30) DEFAULT NULL, `obat_system` varchar(100) NOT NULL DEFAULT 'http://sys-ids.kemkes.go.id/kfa', `obat_display` varchar(200) DEFAULT NULL, `form_code` varchar(50) DEFAULT NULL, `form_system` varchar(100) DEFAULT NULL, `form_display` varchar(100) DEFAULT NULL, `route_code` varchar(50) DEFAULT NULL, `route_system` varchar(100) DEFAULT NULL, `route_display` varchar(100) DEFAULT NULL, `denominator_code` varchar(20) DEFAULT NULL, `denominator_system` varchar(100) DEFAULT NULL, PRIMARY KEY (`kode_brng`)
+                    `kode_brng` varchar(15) NOT NULL,
+                    `obat_code` varchar(30) DEFAULT NULL,
+                    `obat_system` varchar(100) NOT NULL DEFAULT 'http://sys-ids.kemkes.go.id/kfa',
+                    `obat_display` varchar(1000) DEFAULT NULL,
+                    `form_code` varchar(50) DEFAULT NULL,
+                    `form_system` varchar(100) DEFAULT NULL,
+                    `form_display` varchar(100) DEFAULT NULL,
+                    `numerator_code` varchar(20) DEFAULT NULL,
+                    `numerator_system` varchar(100) DEFAULT NULL,
+                    `denominator_code` varchar(20) DEFAULT NULL,
+                    `denominator_system` varchar(100) DEFAULT NULL,
+                    `route_code` varchar(50) DEFAULT NULL,
+                    `route_system` varchar(100) DEFAULT NULL,
+                    `route_display` varchar(100) DEFAULT NULL,
+                    PRIMARY KEY (`kode_brng`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=latin1",
 
                 "CREATE TABLE IF NOT EXISTS `satu_sehat_mapping_lab` (
