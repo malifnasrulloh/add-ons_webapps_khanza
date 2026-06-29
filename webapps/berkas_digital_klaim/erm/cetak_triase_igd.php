@@ -36,7 +36,7 @@ else {
 
 // --- 2. CONFIG DISPLAY (ORIGINAL) ---
 $config = [
-    'sub_judul' => '', 'kode_berkas' => '001', 'warna_bg' => '#FFFFFF', 'warna_txt' => '#000000'
+    'sub_judul' => '', 'kode_berkas' => '011', 'warna_bg' => '#FFFFFF', 'warna_txt' => '#000000'
 ];
 
 switch ($skala_terdeteksi) {

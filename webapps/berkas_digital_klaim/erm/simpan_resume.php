@@ -33,7 +33,7 @@ $koneksi = bukakoneksi();
 $no_rawat = isset($_GET['no_rawat']) ? validTeks4($_GET['no_rawat'], 20) : '';
 
 // 3. CONFIG & VALIDASI
-$kode_berkas = '001'; 
+$kode_berkas = '009'; 
 $upload_dir_abs = dirname($path_root) . "/berkasrawat/pages/upload/";
 $upload_dir_web = "pages/upload/"; 
 

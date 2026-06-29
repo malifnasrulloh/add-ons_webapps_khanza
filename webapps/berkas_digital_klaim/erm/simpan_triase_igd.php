@@ -37,7 +37,7 @@ if(mysqli_num_rows(mysqli_query($koneksi, "SELECT no_rawat FROM data_triase_igdd
 }
 
 // 2. CONFIG
-$config = ['sub_judul' => '', 'kode_berkas' => '001', 'warna_bg' => '#FFFFFF', 'warna_txt' => '#000000'];
+$config = ['sub_judul' => '', 'kode_berkas' => '011', 'warna_bg' => '#FFFFFF', 'warna_txt' => '#000000'];
 switch ($skala_terdeteksi) {
     case 1: $config['sub_judul'] = "TRIASE PRIMER Skala 1 (Resusitasi)"; $config['warna_bg'] = "#FF0000"; $config['warna_txt'] = "#FFFFFF"; break;
     case 2: $config['sub_judul'] = "TRIASE PRIMER Skala 2 (Emergency)"; $config['warna_bg'] = "#FF0000"; $config['warna_txt'] = "#FFFFFF"; break;

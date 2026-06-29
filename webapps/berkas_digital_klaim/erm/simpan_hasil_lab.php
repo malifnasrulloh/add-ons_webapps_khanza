@@ -17,7 +17,7 @@ use Dompdf\Options;
 
 $koneksi = bukakoneksi();
 $no_rawat = isset($_GET['no_rawat']) ? validTeks4($_GET['no_rawat'], 20) : '';
-$kode_berkas = '001';
+$kode_berkas = '013';
 
 // 1. CARI SEMUA WAKTU (Looping Trigger)
 $q_times = "SELECT DISTINCT tgl_periksa, jam 

@@ -19,7 +19,7 @@ $koneksi = bukakoneksi();
 $no_rawat = isset($_POST['no_rawat']) ? validTeks4($_POST['no_rawat'], 20) : '';
 // Ambil Array Foto yang dipilih user dari form
 $selected_imgs = isset($_POST['selected_imgs']) ? $_POST['selected_imgs'] : []; 
-$kode_berkas = '001';
+$kode_berkas = '015';
 
 // 1. CARI SEMUA WAKTU
 $q_times = "SELECT DISTINCT tgl_periksa, jam 

@@ -105,7 +105,7 @@ try {
     $filename = "AsesmenIGD_{$clean_rawat}_" . date('YmdHis') . ".pdf";
     $abs_path = dirname(dirname(__DIR__)) . "/berkasrawat/pages/upload/" . $filename;
     $db_path = "pages/upload/" . $filename;
-    $kode_berkas = '001';
+    $kode_berkas = '012';
 
     if(file_put_contents($abs_path, $output)){
         // Smart Delete file AsesmenIGD lama

@@ -33,7 +33,7 @@ $koneksi = bukakoneksi();
 $no_rawat = isset($_GET['no_rawat']) ? validTeks4($_GET['no_rawat'], 20) : '';
 
 // 3. CONFIG FILE
-$kode_berkas = '001'; // Kode Resume Ralan (GANTI JIKA PERLU)
+$kode_berkas = '010';
 $upload_dir_abs = dirname($path_root) . "/berkasrawat/pages/upload/";
 $upload_dir_web = "pages/upload/"; 
 

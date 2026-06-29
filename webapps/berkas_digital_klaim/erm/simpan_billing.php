@@ -102,7 +102,7 @@ try {
     $filename = "Billing_{$clean_rawat}_" . date('YmdHis') . ".pdf";
     $abs_path = dirname(dirname(__DIR__)) . "/berkasrawat/pages/upload/" . $filename;
     $db_path = "pages/upload/" . $filename;
-    $kode_berkas = '001';
+    $kode_berkas = '016';
 
     if(file_put_contents($abs_path, $output)){
         mysqli_query($koneksi, "DELETE FROM berkas_digital_perawatan WHERE no_rawat='$no_rawat' AND kode='$kode_berkas' AND lokasi_file LIKE '%Billing_%'");
