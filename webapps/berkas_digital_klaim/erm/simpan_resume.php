@@ -292,10 +292,18 @@ try {
     $q_ins = "INSERT INTO berkas_digital_perawatan (no_rawat, kode, lokasi_file) VALUES ('$no_rawat', '$kode_berkas', '$db_path')";
     
     if(mysqli_query($koneksi, $q_ins)) {
-        echo "<script>
-            alert('Resume Medis Berhasil Dibuat!');
-            window.location.href = '../lihat_berkas.php?no_rawat=" . urlencode($no_rawat) . "';
-        </script>";
+        $close = isset($_GET['close']) && $_GET['close'] == '1';
+        if ($close) {
+            echo "<script>
+                alert('Resume Medis Berhasil Dibuat!');
+                window.close();
+            </script>";
+        } else {
+            echo "<script>
+                alert('Resume Medis Berhasil Dibuat!');
+                window.location.href = '../lihat_berkas.php?no_rawat=" . urlencode($no_rawat) . "';
+            </script>";
+        }
     } else {
         throw new Exception("Gagal update database.");
     }

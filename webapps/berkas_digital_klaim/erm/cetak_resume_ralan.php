@@ -98,7 +98,7 @@ $qr_content = "Dikeluarkan di " . $setting['nama_instansi'] . ", Kabupaten/Kota 
 <body>
 
 <div class="no-print" style="position: fixed; top: 20px; right: 20px; z-index: 999;">
-    <button onclick="window.location.href='simpan_resume_ralan.php?no_rawat=<?= urlencode($no_rawat) ?>'" 
+    <button onclick="window.location.href='simpan_resume_ralan.php?no_rawat=<?= urlencode($no_rawat) ?><?= isset($_GET['close']) ? '&close=' . urlencode($_GET['close']) : '' ?>'" 
             style="background: #28a745; color: white; padding: 15px 25px; border: none; cursor: pointer; font-weight: bold; border-radius: 50px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-size: 14px;">
         <i style="margin-right: 5px;">💾</i> SIMPAN PDF
     </button>

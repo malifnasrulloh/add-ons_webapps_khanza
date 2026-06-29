@@ -65,17 +65,17 @@ $res_umum = mysqli_query($koneksi, $q_umum);
 $d_umum = mysqli_fetch_assoc($res_umum);
 
 // [FIX PENTING] LOGIKA FALLBACK DATA KOSONG
-// Jika data triase kosong (suhu/tensi nol), ambil dari pemeriksaan_ralan (Data Perawat)
-if (empty($d_umum['suhu']) || $d_umum['suhu'] == '-' || empty($d_umum['tensi'])) {
-    $q_ttv = mysqli_query($koneksi, "SELECT suhu_tubuh, tensi, nadi, respirasi, berat, keluhan 
+// Jika data triase kosong (suhu/tekanan_darah nol), ambil dari pemeriksaan_ralan (Data Perawat)
+if (empty($d_umum['suhu']) || $d_umum['suhu'] == '-' || empty($d_umum['tekanan_darah'])) {
+    $q_ttv = mysqli_query($koneksi, "SELECT suhu_tubuh, tekanan_darah, nadi, respirasi, berat, keluhan 
                                      FROM pemeriksaan_ralan 
                                      WHERE no_rawat='$no_rawat' 
                                      ORDER BY tgl_perawatan ASC, jam_rawat ASC LIMIT 1");
     if($d_ttv = mysqli_fetch_assoc($q_ttv)) {
         if(empty($d_umum['suhu'])) $d_umum['suhu'] = $d_ttv['suhu_tubuh'];
-        if(empty($d_umum['tensi'])) $d_umum['tensi'] = $d_ttv['tensi'];
+        if(empty($d_umum['tekanan_darah'])) $d_umum['tekanan_darah'] = $d_ttv['tekanan_darah'];
         if(empty($d_umum['nadi'])) $d_umum['nadi'] = $d_ttv['nadi'];
-        if(empty($d_umum['napas'])) $d_umum['napas'] = $d_ttv['respirasi'];
+        if(empty($d_umum['pernapasan'])) $d_umum['pernapasan'] = $d_ttv['respirasi'];
         if(empty($d_umum['berat_badan'])) $d_umum['berat_badan'] = $d_ttv['berat'];
         if(empty($d_umum['keluhan_utama'])) $d_umum['keluhan_utama'] = $d_ttv['keluhan'];
     }

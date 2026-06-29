@@ -50,13 +50,13 @@ switch ($skala_terdeteksi) {
 $q_umum = "SELECT p.nm_pasien, p.no_rkm_medis, p.tgl_lahir, p.jk, p.alamat, rp.tgl_registrasi, rp.jam_reg, d.nm_dokter, tri.*, mtmk.macam_kasus FROM reg_periksa rp JOIN pasien p ON rp.no_rkm_medis = p.no_rkm_medis LEFT JOIN data_triase_igd tri ON rp.no_rawat = tri.no_rawat LEFT JOIN dokter d ON rp.kd_dokter = d.kd_dokter LEFT JOIN master_triase_macam_kasus mtmk ON tri.kode_kasus = mtmk.kode_kasus WHERE rp.no_rawat = '$no_rawat'";
 $d_umum = mysqli_fetch_assoc(mysqli_query($koneksi, $q_umum));
 
-if (empty($d_umum['suhu']) || $d_umum['suhu'] == '-' || empty($d_umum['tensi'])) {
+if (empty($d_umum['suhu']) || $d_umum['suhu'] == '-' || empty($d_umum['tekanan_darah'])) {
     $q_ttv = mysqli_query($koneksi, "SELECT suhu_tubuh, tensi, nadi, respirasi, berat, keluhan FROM pemeriksaan_ralan WHERE no_rawat='$no_rawat' ORDER BY tgl_perawatan ASC, jam_rawat ASC LIMIT 1");
     if($d_ttv = mysqli_fetch_assoc($q_ttv)) {
         if(empty($d_umum['suhu'])) $d_umum['suhu'] = $d_ttv['suhu_tubuh'];
-        if(empty($d_umum['tensi'])) $d_umum['tensi'] = $d_ttv['tensi'];
+        if(empty($d_umum['tekanan_darah'])) $d_umum['tekanan_darah'] = $d_ttv['tensi'];
         if(empty($d_umum['nadi'])) $d_umum['nadi'] = $d_ttv['nadi'];
-        if(empty($d_umum['napas'])) $d_umum['napas'] = $d_ttv['respirasi'];
+        if(empty($d_umum['pernapasan'])) $d_umum['pernapasan'] = $d_ttv['respirasi'];
         if(empty($d_umum['berat_badan'])) $d_umum['berat_badan'] = $d_ttv['berat'];
         if(empty($d_umum['keluhan_utama'])) $d_umum['keluhan_utama'] = $d_ttv['keluhan'];
     }

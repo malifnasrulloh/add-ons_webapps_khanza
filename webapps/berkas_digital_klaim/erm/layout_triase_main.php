@@ -106,7 +106,7 @@
             <b class="fs-10">TANDA VITAL</b>
         </td>
         <td>
-            Suhu (C) : <?= $d_umum['suhu'] ?>, Nyeri : <?= $d_umum['nyeri'] ?>, Tensi : <?= $d_umum['tensi'] ?>, Nadi(/menit) : <?= $d_umum['nadi'] ?>, Saturasi O²(%) : <?= $d_umum['saturasi_o2'] ?>, Respirasi(/menit) : <?= $d_umum['napas'] ?>
+            Suhu (C) : <?= $d_umum['suhu'] ?>, Nyeri : <?= $d_umum['nyeri'] ?>, Tensi : <?= $d_umum['tekanan_darah'] ?>, Nadi(/menit) : <?= $d_umum['nadi'] ?>, Saturasi O²(%) : <?= $d_umum['saturasi_o2'] ?>, Respirasi(/menit) : <?= $d_umum['pernapasan'] ?>
         </td>
     </tr>
 </table>
