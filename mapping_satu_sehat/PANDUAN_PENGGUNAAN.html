@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panduan Penggunaan — mapping_satu_sehat</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #1e293b; }
+        .hero { background: linear-gradient(135deg, #1e1b4b, #6d28d9); color: white; padding: 3rem 0; margin-bottom: 2rem; border-radius: 0 0 24px 24px; box-shadow: 0 10px 30px rgba(109,40,217,0.2); }
+        .hero h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .card { border: none; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 1.5rem; overflow: hidden; }
+        .card-header { padding: 1.25rem 1.5rem; color: white; font-weight: 700; font-size: 1.1rem; }
+        
+        .step-number { 
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; background: #e0e7ff; color: #4f46e5;
+            border-radius: 50%; font-weight: 700; font-size: 0.85rem; margin-right: 10px;
+        }
+        
+        .module-icon { 
+            width: 48px; height: 48px; border-radius: 12px; display: inline-flex; 
+            align-items: center; justify-content: center; font-size: 1.4rem; color: white; margin-right: 1rem; 
+        }
+        
+        .alert-tip { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; }
+        .btn-donasi { background: linear-gradient(135deg, #f59e0b, #ef4444); color: white; border: none; font-weight: 700; padding: 10px 24px; border-radius: 30px; box-shadow: 0 4px 15px rgba(239,68,68,0.3); transition: all 0.2s;}
+        .btn-donasi:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(239,68,68,0.4); color: white; }
+    </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+    <div class="container">
+        <div class="d-flex align-items-center mb-3">
+            <i class="fa-solid fa-book-medical fa-3x me-4 text-indigo-300"></i>
+            <div>
+                <h1 class="mb-1">Panduan Penggunaan Aplikasi</h1>
+                <p class="mb-0 text-indigo-100 fs-5">Aplikasi Mapping Satu Sehat Integrasi SIMRS Khanza</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    
+    <div class="alert alert-info border-0 shadow-sm rounded-4 mb-4" style="background: #eff6ff;">
+        <h5 class="fw-bold text-primary mb-2"><i class="fa fa-info-circle me-2"></i>Tentang Aplikasi Ini</h5>
+        <p class="mb-0 text-primary-emphasis">
+            Aplikasi ini digunakan untuk memetakan (<i>mapping</i>) data internal rumah sakit Anda (seperti obat, lab, radiologi, vaksin) 
+            ke dalam kamus standar Kementerian Kesehatan RI (Satu Sehat). Hal ini WAJIB dilakukan agar pengiriman data ke Satu Sehat bisa divalidasi.
+        </p>
+    </div>
+
+    <!-- Modul Obat -->
+    <div class="card">
+        <div class="card-header" style="background: linear-gradient(135deg,#4f46e5,#7c3aed);">
+            <div class="d-flex align-items-center">
+                <div class="module-icon bg-white bg-opacity-25 shadow-sm"><i class="fa fa-pills text-white"></i></div>
+                <div>Mapping Obat (KFA)</div>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted">Pemetaan data obat RS (diambil dari tabel databarang) ke Kamus Farmasi dan Alkes (KFA).</p>
+            <ol class="list-unstyled mb-0">
+                <li class="mb-3 d-flex"><span class="step-number">1</span><div>Pilih obat pada tabel data. Klik ikon <b>Pensil</b> (Edit) di kolom Aksi.</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">2</span><div><b>KFA Obat:</b> Ketik nama generik atau merek obat, lalu pilih kode KFA yang paling sesuai.</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">3</span><div><b>Bentuk Sediaan:</b> Pilih bentuk sediaan obat tersebut (misal: Tablet, Sirup, Injeksi).</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">4</span><div><b>Rute Penggunaan:</b> Pilih rute bagaimana obat diberikan (misal: Oral, Intravena).</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">5</span><div><b>Satuan Numerator (Kekuatan):</b> Pilih satuan kekuatan zat aktif (misal: `mg`, `mL`, `%`). Sistem otomatis mendeteksi standar <b>UCUM</b>.</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">6</span><div><b>Satuan Denominator (Penyajian):</b> Pilih satuan sediaan atau kemasan (misal: `TAB`, `CAP`, `PCS`). Sistem otomatis mendeteksi standar <b>DrugForm</b>.</div></li>
+                <li class="mb-1 d-flex"><span class="step-number">7</span><div>Klik <b>Simpan</b>.</div></li>
+            </ol>
+            <div class="alert alert-tip p-3 mt-3 mb-0">
+                <small class="d-block mb-1 text-warning-emphasis fw-bold"><i class="fa fa-lightbulb me-2"></i>Tips:</small>
+                <small class="text-muted">
+                    Angka numerik kekuatan (misal: 500) tidak perlu diinput di sini. Aplikasi akan otomatis mengambil data tersebut dari kolom <b>Kapasitas / Isi</b> pada tabel master barang rumah sakit Anda.
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modul Lab -->
+    <div class="card">
+        <div class="card-header" style="background: linear-gradient(135deg,#0891b2,#06b6d4);">
+            <div class="d-flex align-items-center">
+                <div class="module-icon bg-white bg-opacity-25 shadow-sm"><i class="fa fa-flask text-white"></i></div>
+                <div>Mapping Laboratorium (LOINC)</div>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted">Pemetaan parameter pemeriksaan lab (tabel template_laboratorium) ke standar LOINC internasional dan sampel SNOMED-CT.</p>
+            <ol class="list-unstyled mb-0">
+                <li class="mb-3 d-flex"><span class="step-number">1</span><div>Klik <b>Edit</b> pada parameter lab (misal: Hemoglobin).</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">2</span><div><b>Kode LOINC:</b> Ketik istilah pemeriksaan dalam bahasa Inggris (contoh: Hemoglobin), pilih kode LOINC yang tepat. Perhatikan spesimen pendukungnya pada deskripsi (Bld/Ser/dll).</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">3</span><div><b>Kode Sampel Snomed:</b> Masukkan jenis sampel bahan (contoh: Blood, Urine, Serum).</div></li>
+                <li class="d-flex"><span class="step-number">4</span><div>Simpan data.</div></li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Modul Radiologi -->
+    <div class="card">
+        <div class="card-header" style="background: linear-gradient(135deg,#be185d,#ec4899);">
+            <div class="d-flex align-items-center">
+                <div class="module-icon bg-white bg-opacity-25 shadow-sm"><i class="fa fa-x-ray text-white"></i></div>
+                <div>Mapping Radiologi (LOINC)</div>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted">Pemetaan tindakan radiologi (jns_perawatan_radiologi) ke procedure LOINC.</p>
+            <ol class="list-unstyled mb-0">
+                <li class="mb-3 d-flex"><span class="step-number">1</span><div>Edit tindakan radiologi (misal: Rontgen Thorax).</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">2</span><div><b>Kode LOINC:</b> Cari kode LOINC yang sesuai dengan modalitas dan organ tubuh (contoh: XR Chest).</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">3</span><div><b>Kode Modality Snomed:</b> (Opsional) Pilih metode modality dari SNOMED jika diminta.</div></li>
+                <li class="d-flex"><span class="step-number">4</span><div>Klik <b>Simpan</b>.</div></li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Modul Vaksin -->
+    <div class="card">
+        <div class="card-header" style="background: linear-gradient(135deg,#059669,#10b981);">
+            <div class="d-flex align-items-center">
+                <div class="module-icon bg-white bg-opacity-25 shadow-sm"><i class="fa fa-syringe text-white"></i></div>
+                <div>Mapping Vaksin (CVX/KFA)</div>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted">Pemetaan barang medis kategori vaksin (databarang) ke referensi Vaksin Kemenkes.</p>
+            <ol class="list-unstyled mb-0">
+                <li class="mb-3 d-flex"><span class="step-number">1</span><div>Pilih vaksin untuk diedit.</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">2</span><div><b>Kode Vaksin KFA:</b> Cari nama vaksin (contoh: BCG, Hepatitis B).</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">3</span><div><b>Rute:</b> Pilih rute penyuntikan (Intramuscular, Subcutaneous, Oral, dll).</div></li>
+                <li class="mb-3 d-flex"><span class="step-number">4</span><div><b>Jumlah Dosis & Satuan:</b> Masukkan quantity (misal: 0.5) dan satuannya di UCUM (misal: mL).</div></li>
+                <li class="d-flex"><span class="step-number">5</span><div>Simpan.</div></li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Penutup & Apresiasi -->
+    <div class="text-center mt-5 mb-3">
+        <p class="text-muted mb-4">Aplikasi ini disediakan gratis oleh pengembang. Jika terbantu, mohon dukung kami.</p>
+        <a href="https://saweria.co/ichsanleonhart" target="_blank" class="btn btn-donasi text-decoration-none d-inline-block">
+            <i class="fa fa-heart me-2"></i> Donasi Dev via Saweria
+        </a>
+    </div>
+
+</div>
+
+</body>
+</html>
