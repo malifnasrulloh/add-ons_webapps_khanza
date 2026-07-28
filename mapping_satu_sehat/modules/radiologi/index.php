@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * modules/radiologi/index.php — Halaman Mapping Radiologi Satu Sehat
  */
@@ -101,6 +101,21 @@ check_module_access('satu_sehat_mapping_radiologi');
                     <small class="text-muted">Tindakan Radiologi:</small><br>
                     <strong id="m_nama_rad" class="fs-4 text-dark"></strong>
                     <br><small class="text-muted" id="m_kd_rad"></small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark">0. DICOM Modality</label>
+                    <select class="form-select" id="sel_modality_rad">
+                        <option value="CR">CR - Computed Radiography (Default)</option>
+                        <option value="XR">XR - X-Ray / Radiography</option>
+                        <option value="US">US - Ultrasound</option>
+                        <option value="CT">CT - Computed Tomography</option>
+                        <option value="MR">MR - Magnetic Resonance</option>
+                        <option value="MG">MG - Mammography</option>
+                        <option value="DX">DX - Digital Radiography</option>
+                        <option value="RF">RF - Radio Fluoroscopy</option>
+                        <option value="OT">OT - Other</option>
+                    </select>
+                    <div class="form-text">Tipe Modality DICOM untuk Orthanc PACS.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold text-primary">1. Kode LOINC (Procedure)</label>
@@ -313,8 +328,8 @@ $(function() {
     });
 
     $('#tableRad tbody').on('click','.btn-map',function(){
-        var kd=$(this).data('kd'),nama=$(this).data('nama'),code=$(this).data('code'),disp=$(this).data('display'),sc=$(this).data('sampel-code'),sd=$(this).data('sampel-display');
-        $('#m_kd_jenis_prw').val(kd); $('#m_nama_rad').text(nama); $('#m_kd_rad').text(kd);
+        var kd=$(this).data('kd'),nama=$(this).data('nama'),modality=$(this).data('modality')||'CR',code=$(this).data('code'),disp=$(this).data('display'),sc=$(this).data('sampel-code'),sd=$(this).data('sampel-display');
+        $('#m_kd_jenis_prw').val(kd); $('#m_nama_rad').text(nama); $('#m_kd_rad').text(kd); $('#sel_modality_rad').val(modality);
         fhirSetBadge('loinc_source_badge_rad', 'database');
         fhirSetBadge('snomed_source_badge_rad', 'database');
         
@@ -345,6 +360,7 @@ $(function() {
         $.post('ajax.php?action=save_mapping',{
             csrf_token:CSRF_TOKEN,
             kd_jenis_prw:$('#m_kd_jenis_prw').val(),
+            modality:$('#sel_modality_rad').val()||'CR',
             loinc_code:$('#sel_loinc_rad').val()||'',
             loinc_display:$('#m_loinc_display_rad').val(),
             snomed_code:$('#sel_snomed_rad').val()||'',

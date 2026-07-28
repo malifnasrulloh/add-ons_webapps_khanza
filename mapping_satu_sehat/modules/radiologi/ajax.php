@@ -41,7 +41,7 @@ try {
         $recordsFiltered = (int)$stmtC->fetchColumn();
 
         $sql = "SELECT jp.kd_jenis_prw, jp.nm_perawatan, pj.png_jawab,
-                       mr.code, mr.system, mr.display,
+                       mr.modality, mr.code, mr.system, mr.display,
                        mr.sampel_code, mr.sampel_system, mr.sampel_display
                 FROM jns_perawatan_radiologi jp
                 JOIN penjab pj ON jp.kd_pj = pj.kd_pj
@@ -79,9 +79,11 @@ try {
                 ? '<span class="badge bg-success"><i class="fa fa-check"></i> Mapped</span>'
                 : '<span class="badge bg-danger">Belum</span>';
 
+            $modality = !empty($row['modality']) ? htmlspecialchars($row['modality'], ENT_QUOTES, 'UTF-8') : 'CR';
             $info = "";
             if ($row['code']) {
-                $info .= "<span class='badge bg-primary'>LOINC</span> <b>" . htmlspecialchars($row['code'], ENT_QUOTES, 'UTF-8') . "</b><br>";
+                $info .= "<span class='badge bg-dark me-1'>MODALITY: <b>$modality</b></span> ";
+                $info .= "<span class='badge bg-primary me-1'>LOINC</span> <b>" . htmlspecialchars($row['code'], ENT_QUOTES, 'UTF-8') . "</b><br>";
                 $info .= "<small class='text-muted'>" . htmlspecialchars(substr($row['display'],0,50), ENT_QUOTES, 'UTF-8') . "</small><br>";
                 if ($row['sampel_code']) {
                     $info .= "<span class='badge bg-info text-dark'>SNOMED</span> <b>" . htmlspecialchars($row['sampel_code'], ENT_QUOTES, 'UTF-8') . "</b><br>";
@@ -96,6 +98,7 @@ try {
             $btn = "<button class='btn btn-sm btn-outline-danger btn-map'
                     data-kd='$kode_safe'
                     data-nama='$nama_safe'
+                    data-modality='$modality'
                     data-code='" . htmlspecialchars($row['code'] ?? '', ENT_QUOTES, 'UTF-8') . "'
                     data-display='" . htmlspecialchars($row['display'] ?? '', ENT_QUOTES, 'UTF-8') . "'
                     data-sampel-code='" . htmlspecialchars($row['sampel_code'] ?? '', ENT_QUOTES, 'UTF-8') . "'
@@ -330,6 +333,7 @@ try {
         validate_csrf();
 
         $kd_jenis_prw  = trim($_POST['kd_jenis_prw']   ?? '');
+        $modality      = trim($_POST['modality']       ?? 'CR');
         $loinc_code    = trim($_POST['loinc_code']      ?? '');
         $loinc_display = trim($_POST['loinc_display']   ?? '');
         $snomed_code   = trim($_POST['snomed_code']     ?? '');
@@ -341,15 +345,15 @@ try {
         }
 
         $sql = "INSERT INTO satu_sehat_mapping_radiologi
-                (kd_jenis_prw, code, system, display, sampel_code, sampel_system, sampel_display)
-                VALUES (:kd, :lc, 'http://loinc.org', :ld, :sc, 'http://snomed.info/sct', :sd)
+                (kd_jenis_prw, modality, code, system, display, sampel_code, sampel_system, sampel_display)
+                VALUES (:kd, :mod, :lc, 'http://loinc.org', :ld, :sc, 'http://snomed.info/sct', :sd)
                 ON DUPLICATE KEY UPDATE
-                code=:lc2, display=:ld2, sampel_code=:sc2, sampel_display=:sd2";
+                modality=:mod2, code=:lc2, display=:ld2, sampel_code=:sc2, sampel_display=:sd2";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':kd'=>$kd_jenis_prw, ':lc'=>$loinc_code, ':ld'=>$loinc_display, ':sc'=>$snomed_code, ':sd'=>$snomed_display,
-            ':lc2'=>$loinc_code, ':ld2'=>$loinc_display, ':sc2'=>$snomed_code, ':sd2'=>$snomed_display
+            ':kd'=>$kd_jenis_prw, ':mod'=>$modality, ':lc'=>$loinc_code, ':ld'=>$loinc_display, ':sc'=>$snomed_code, ':sd'=>$snomed_display,
+            ':mod2'=>$modality, ':lc2'=>$loinc_code, ':ld2'=>$loinc_display, ':sc2'=>$snomed_code, ':sd2'=>$snomed_display
         ]);
 
         // Auto-cache SNOMED to local database for future searches
