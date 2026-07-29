@@ -137,6 +137,18 @@ check_module_access('satu_sehat_mapping_radiologi');
                     <input type="hidden" id="m_snomed_display_rad">
                     <div class="form-text">Contoh: tubuh yang difoto. System: <i>http://snomed.info/sct</i></div>
                 </div>
+
+                <div class="p-3 bg-light rounded border border-primary-subtle mt-3">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="chk_apply_same_name" checked>
+                        <label class="form-check-label fw-bold text-dark" for="chk_apply_same_name">
+                            <i class="fa fa-layer-group text-primary me-1"></i> Terapkan ke SEMUA tindakan dengan nama yang sama
+                        </label>
+                    </div>
+                    <div class="form-text mt-1 text-muted" style="font-size:0.75rem;">
+                        Otomatis memetakan seluruh variasi tarif / kelas perawatan yang memiliki nama pemeriksaan persis sama.
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -330,6 +342,7 @@ $(function() {
     $('#tableRad tbody').on('click','.btn-map',function(){
         var kd=$(this).data('kd'),nama=$(this).data('nama'),modality=$(this).data('modality')||'CR',code=$(this).data('code'),disp=$(this).data('display'),sc=$(this).data('sampel-code'),sd=$(this).data('sampel-display');
         $('#m_kd_jenis_prw').val(kd); $('#m_nama_rad').text(nama); $('#m_kd_rad').text(kd); $('#sel_modality_rad').val(modality);
+        $('#chk_apply_same_name').prop('checked', true);
         fhirSetBadge('loinc_source_badge_rad', 'database');
         fhirSetBadge('snomed_source_badge_rad', 'database');
         
@@ -364,7 +377,8 @@ $(function() {
             loinc_code:$('#sel_loinc_rad').val()||'',
             loinc_display:$('#m_loinc_display_rad').val(),
             snomed_code:$('#sel_snomed_rad').val()||'',
-            snomed_display:$('#m_snomed_display_rad').val()
+            snomed_display:$('#m_snomed_display_rad').val(),
+            apply_same_name:$('#chk_apply_same_name').is(':checked') ? 1 : 0
         },function(r){
             btn.html(orig).prop('disabled',false);
             if(r.status==='success'){

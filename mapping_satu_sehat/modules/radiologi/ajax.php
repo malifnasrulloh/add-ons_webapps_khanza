@@ -338,10 +338,25 @@ try {
         $loinc_display = trim($_POST['loinc_display']   ?? '');
         $snomed_code   = trim($_POST['snomed_code']     ?? '');
         $snomed_display= trim($_POST['snomed_display']  ?? '');
+        $apply_same    = !empty($_POST['apply_same_name']);
 
         if (empty($kd_jenis_prw) || empty($loinc_code)) {
             echo json_encode(['status' => 'error', 'message' => 'Data tidak lengkap.']);
             exit;
+        }
+
+        // Determine target procedure codes
+        $targetKds = [$kd_jenis_prw];
+        if ($apply_same) {
+            $stmtTarget = $pdo->prepare(
+                "SELECT kd_jenis_prw FROM jns_perawatan_radiologi 
+                 WHERE nm_perawatan = (SELECT nm_perawatan FROM jns_perawatan_radiologi WHERE kd_jenis_prw = :kd)"
+            );
+            $stmtTarget->execute([':kd' => $kd_jenis_prw]);
+            $fetched = $stmtTarget->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($fetched)) {
+                $targetKds = $fetched;
+            }
         }
 
         $sql = "INSERT INTO satu_sehat_mapping_radiologi
@@ -351,10 +366,14 @@ try {
                 modality=:mod2, code=:lc2, display=:ld2, sampel_code=:sc2, sampel_display=:sd2";
 
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ':kd'=>$kd_jenis_prw, ':mod'=>$modality, ':lc'=>$loinc_code, ':ld'=>$loinc_display, ':sc'=>$snomed_code, ':sd'=>$snomed_display,
-            ':mod2'=>$modality, ':lc2'=>$loinc_code, ':ld2'=>$loinc_display, ':sc2'=>$snomed_code, ':sd2'=>$snomed_display
-        ]);
+        $count = 0;
+        foreach ($targetKds as $tkd) {
+            $stmt->execute([
+                ':kd'=>$tkd, ':mod'=>$modality, ':lc'=>$loinc_code, ':ld'=>$loinc_display, ':sc'=>$snomed_code, ':sd'=>$snomed_display,
+                ':mod2'=>$modality, ':lc2'=>$loinc_code, ':ld2'=>$loinc_display, ':sc2'=>$snomed_code, ':sd2'=>$snomed_display
+            ]);
+            $count++;
+        }
 
         // Auto-cache SNOMED to local database for future searches
         if (!empty($snomed_code)) {
@@ -362,7 +381,11 @@ try {
             $stmtCache->execute([':id' => $snomed_code, ':term' => $snomed_display]);
         }
 
-        echo json_encode(['status' => 'success', 'message' => 'Mapping radiologi berhasil disimpan.']);
+        $msg = ($count > 1) 
+            ? "Mapping radiologi berhasil diterapkan ke $count tindakan dengan nama yang sama."
+            : "Mapping radiologi berhasil disimpan.";
+
+        echo json_encode(['status' => 'success', 'message' => $msg, 'affected_count' => $count]);
         exit;
     }
 
