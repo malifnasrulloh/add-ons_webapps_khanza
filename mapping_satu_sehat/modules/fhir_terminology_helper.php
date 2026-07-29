@@ -23,18 +23,17 @@ function fhir_get_credential() {
  * @return array Array results untuk select2
  */
 function fhir_search_snomed($keyword, $ecl = null) {
-    // Gunakan Snowstorm Training API (Public, No Auth)
-    $url = 'https://snowstorm-training.snomedtools.org/fhir/ValueSet/$expand';
-    
-    // Jika ada ECL, gabungkan ke parameter url. Jika tidak, gunakan base fhir_vs
+    // Use SNOMED Browser Public FHIR R4 API Endpoint
     $vs_url = 'http://snomed.info/sct?fhir_vs';
     if ($ecl !== null) {
         $vs_url .= '=ecl/' . urlencode($ecl);
     }
-    
-    $url .= '?url=' . urlencode($vs_url)
-         . '&filter=' . urlencode($keyword)
-         . '&count=50'; // Ambil hingga 50 untuk sinkronisasi dengan pagination lokal
+
+    $url = 'https://snomedbrowser.org/fhir/ValueSet/$expand'
+         . '?filter=' . urlencode($keyword)
+         . '&count=50'
+         . '&url=' . urlencode($vs_url)
+         . '&_format=json';
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
