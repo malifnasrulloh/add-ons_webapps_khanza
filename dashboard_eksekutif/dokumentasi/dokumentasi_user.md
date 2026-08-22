@@ -26,7 +26,8 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 ## 💼 3. Kendali Biaya (Biaya Riil vs Plafon)
 *Bagian ini fokus pada pencegahan kebocoran biaya saat pasien masih dirawat.*
 
-*   **Plafon Ranap**: Pantau biaya pasien yang opname secara *realtime*. Di sini kamu bisa lihat apakah billing pasien sudah mendekati plafon BPJS atau asuransi tertentu. Gak perlu nunggu pasien pulang buat tau billingnya sudah bengkak atau belum.
+*   **Plafon Ranap (Casemix & MPP Audit)**: Pantau biaya pasien yang opname secara *realtime* dengan komparasi langsung ke plafon INACBG/Asuransi. Terintegrasi mandiri dengan **AI Casemix Cost Auditor** dan **EMR Inspector** (tanpa perlu aplikasi Edokter luar).
+*   **Kolom Audit & Berkas Klaim**: Membaca diagnosa awal/akhir, counter badge Lab & Radiologi interaktif (klik untuk detail data hasil pemeriksaan), berkas kelengkapan klaim BPJS (Resume Medis, Triase, ADIME, Asesmen, Laporan Operasi), serta indikator Lama Rawat (LOS).
 *   **Ketersediaan Bed**: Pantau okupansi bed dan kunjungan poli secara langsung untuk manajemen antrean.
 
 ![Monitoring Plafon Rawat Inap](4. Plafon Ranap.jpg)
@@ -42,6 +43,12 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 
 *   **Neraca Saldo**: Laporan keseimbangan total Debet dan Kredit dari seluruh akun/rekening. Dilengkapi dengan perhitungan Saldo Awal dan Mutasi yang sangat presisi (Zero Margin of Error).
 ![Neraca Saldo](59. neraca saldo.jpg)
+
+*   **Laporan Laba Rugi (`akuntansi_keuangan.php`)**: Laporan yang menyajikan total pendapatan dan biaya untuk mengukur profitabilitas bersih rumah sakit.
+![Laporan Laba Rugi](55. laporan laba rugi.jpg)
+
+*   **Laporan Arus Kas Keluar Masuk (`akuntansi_mutasi_kas.php`)**: Memetakan mutasi uang keluar masuk per rekening bank/kas secara dinamis.
+![Laporan Arus Keluar Masuk Kas](56. laporan arus keluar masuk kas.jpg)
 
 *   **Rasio Keuangan & Cashflow**: Pantau indikator kesehatan finansial RS (Rasio Lancar, Profitabilitas, dll) secara instan. Beban dan Pendapatan terkalibrasi otomatis dari jurnal!
 ![Rasio Keuangan](58. Rasio Keuangan.jpg)
@@ -75,9 +82,9 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 *   **Laporan Absensi**: Pantau kedisiplinan pegawai, dari jam masuk, keterlambatan, hingga rekapitulasi ketidakhadiran secara visual.
 ![Dashboard Analytics Absensi](19. Dashboard analitics Absensi.jpg)
 ![Rekap Keterlambatan](18. Rekap keterlambatan Pegawai.jpg)
+![Detail Absensi Staf](17. Rincian Data Absensi.jpg)
 
-*   **Superadmin: Migrasi Schema Jadwal DB**: Khusus buat Super Admin! Kalo nemuin Laporan Absensi Khanza error pas ada yang jadwalnya "Libur" atau "Cuti", klik tombol "Migrasi Schema DB" di halaman Laporan Absensi. Sistem bakal otomatis beresin table database (ALTER TABLE ENUM) tanpa perlu buka PhpMyAdmin!
-![Migrasi Schema DB]([Screenshot: superadmin_migrasi_db.jpg])
+*   **Superadmin: Migrasi Schema Jadwal DB**: Khusus buat Super Admin! Tombol migrasi ini terletak pada bagian atas header panel Laporan Absensi. Jika jadwal baru ditambahkan di SIMKES Khanza (misalnya "Libur Khusus"), klik tombol ini untuk sinkronisasi otomatis tipe enum tabel tanpa memodifikasi schema secara manual.
 
 ---
 
@@ -90,7 +97,7 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 ![Dashboard Data BOR LOS TOI](22. Dashboard Data BOR LOS TOI.jpg)
 ![Detail BOR per Bangsal](23. Detail per bangsal BoR Los Toi.jpg)
 
-*   **Laporan Penyakit**: Visualisasi 10 besar diagnosa penyakit (ICD-10) untuk perencanaan stok obat dan alat kesehatan.
+*   **Laporan Penyakit**: Visualisasi 10 besar diagnosa penyakit (ICD-10) untuk perencanaan stok obat dan alkes.
 ![Rangking Penyakit Terbanyak](24. Sepuluh besar penyakit terbanyak.jpg)
 
 *   **Waktu Tunggu (TAT)**: Pantau kecepatan pelayanan dari pendaftaran hingga pasien menerima obat. Crucial untuk kepuasan pasien!
@@ -115,12 +122,19 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 ![Dashboard Analytics Laporan Operasi](37. Dashboard Analitics laporan operasi.jpg)
 ![Rincian Operasi](38. Data rincian tindakan operasi.jpg)
 
+*   **Rencana & Rujukan Operasi (`rujukan_operasi.php`)**: Memantau jadwal antrean tindakan operasi bedah secara realtime dan mengidentifikasi dokter spesialis operator utama.
+![Rencana Operasi](39. Dashboard Rencana operasi.jpg)
+
 ---
 
 ## 💊 8. Manajemen Farmasi (Gudang Cuan)
 
 *   **Monitoring Stok**: Pantau stok berjalan di gudang farmasi dan apotek secara real-time.
 ![Dashboard Stok Farmasi](40. Dashboard Stok Berjalan Farmasi.jpg)
+
+*   **Stok Opname (`laporan_stok_opname.php`)**: Membandingkan pencatatan komputer (SIMKES) dengan fisik obat di gudang secara berkala untuk menghindari selisih.
+![Hasil Stock Opname](42. Dashboard hasil stock opname Farmasi.jpg)
+![Rincian Selisih Stock Opname](43. Data Rincian Hasil Stok Opname Farmasi.jpg)
 
 *   **Profit Farmasi**: Analisa keuntungan dari penjualan obat dan pemberian resep.
 ![Dashboard Profit Farmasi](44. Dashboard Proyeksi Keuntungan Farmasi.jpg)
@@ -139,6 +153,9 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 *   **Audit Kepatuhan ERM**: Sistem cerdas yang mengaudit kelengkapan pengisian Rekam Medis Elektronik oleh para PPA (Dokter/Perawat).
 ![Audit Kepatuhan ERM](52. Audit Kepatuhan Kelengkapan ERM.jpg)
 
+*   **Audit Trail Jurnal SQL & Sistem (`laporan_audit_trail.php`)**: Rekam jejak aktivitas modifikasi data (INSERT/UPDATE/DELETE) yang dilakukan oleh pengguna SIMKES Khanza untuk pengawasan kepatuhan data.
+![Audit Trail Tracker SQL](54. Audit Trail trackersql.jpg)
+
 ---
 
 ## 🎨 10. Fitur Premium Dashboard
@@ -156,6 +173,24 @@ Buat bang admin IT yang baru pasang:
 1.  **Aktivasi Database**: Jika instalasi awal, pastikan file `config/koneksi.php` sudah terhubung ke database Khanza.
 2.  **Copyright Protection**: Jangan menghapus atau menyembunyikan link developer di footer (Rule #17) atau aplikasi akan masuk ke mode *Self-Destruct* (Blank Page).
 3.  **Donasi**: Klik nama developer di bawah buat kirim apresiasi kopi agar fitur baru terus rilis!
+
+---
+
+## 🤖 12. Peningkatan AI Advisor Terkini (What's New?)
+
+Kami telah mengintegrasikan modul kecerdasan buatan dinamis (**Generative AI**) di 7 Laporan Dashboard Eksekutif utama. Fitur baru ini dirancang untuk bertindak sebagai penasihat eksekutif (Advisor) bagi Direktur dan Manajemen.
+
+Peningkatan mencakup:
+1.  **AI Receivables & Billing Collector Advisor** (Laporan Piutang Detail)
+2.  **AI Cash Flow & Liquidity Advisor** (Arus Kas Langsung & Tidak Langsung)
+3.  **AI BPJS Queue Compliance Advisor** (Laporan Antrean Online)
+4.  **AI Patient Demographics & Marketing Advisor** (Laporan Demografi Asal Pasien)
+5.  **AI Pharmacy Stock & Purchase Advisor** (Laporan Stok & Aset Farmasi)
+6.  **AI Satu Sehat Advisor** (Audit Kepatuhan RME Satu Sehat)
+7.  **AI HR & Workforce Attendance Advisor** (Laporan Absensi & Risiko Kelelahan/Lembur)
+
+> [!TIP]
+> Untuk melihat demo lengkap, use cases, contoh prompt, contoh output, dan mencetak laporan presentasi manajemen (PDF), silakan akses halaman khusus **[What's New (AI & Fitur)](whats_new.php)** melalui menu sidebar utama.
 
 ---
 

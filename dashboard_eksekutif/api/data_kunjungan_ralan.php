@@ -177,7 +177,15 @@ try {
     // Walaupun PHP 7.3 PDO punya bindValue dengan PDO::PARAM_INT, concatenation start & length yang di casting (int) sudah aman
     $sql_limit = ($length != -1) ? " LIMIT " . (int)$start . ", " . (int)$length : "";
 
-    $sql_data = "SELECT rp.no_rawat, rp.tgl_registrasi, rp.jam_reg, p.no_rkm_medis, p.nm_pasien, d.nm_dokter, pl.nm_poli, pj.png_jawab, pj.kd_pj, rp.stts " . $sql_from . " ORDER BY rp.tgl_registrasi DESC, rp.jam_reg DESC $sql_limit";
+    $sql_data = "SELECT rp.no_rawat, rp.tgl_registrasi, rp.jam_reg, p.no_rkm_medis, p.nm_pasien, d.nm_dokter, pl.nm_poli, pj.png_jawab, pj.kd_pj, rp.stts,
+                 (SELECT COUNT(*) FROM periksa_lab WHERE no_rawat = rp.no_rawat) as total_lab,
+                 (SELECT COUNT(*) FROM periksa_radiologi WHERE no_rawat = rp.no_rawat) as total_rad,
+                 (SELECT COUNT(no_rawat) FROM resume_pasien WHERE no_rawat = rp.no_rawat) as ada_resume,
+                 (SELECT COUNT(no_rawat) FROM data_triase_igd WHERE no_rawat = rp.no_rawat) as ada_triase,
+                 (SELECT COUNT(no_rawat) FROM penilaian_medis_igd WHERE no_rawat = rp.no_rawat) as ada_asesmen,
+                 (SELECT COUNT(no_rawat) FROM operasi WHERE no_rawat = rp.no_rawat) as ada_operasi,
+                 (SELECT p2.nm_penyakit FROM diagnosa_pasien dp JOIN penyakit p2 ON dp.kd_penyakit = p2.kd_penyakit WHERE dp.no_rawat = rp.no_rawat ORDER BY dp.prioritas ASC LIMIT 1) as diagnosa_awal
+                 " . $sql_from . " ORDER BY rp.tgl_registrasi DESC, rp.jam_reg DESC $sql_limit";
 
     $stmt_data = $koneksi_pdo->prepare($sql_data);
     $stmt_data->execute($params);
@@ -199,6 +207,15 @@ try {
             'kd_pj'      => $row['kd_pj'],
             'status'     => $row['stts'],
             'is_anomali' => $is_anomali,
+            
+            'diagnosa_awal' => $row['diagnosa_awal'] ?: '-',
+            'count_lab'     => $row['total_lab'],
+            'count_rad'     => $row['total_rad'],
+            'klaim_resume'  => $row['ada_resume'],
+            'klaim_triase'  => $row['ada_triase'],
+            'klaim_asesmen' => $row['ada_asesmen'],
+            'klaim_operasi' => $row['ada_operasi'],
+            
             // Placeholder — akan diisi async oleh frontend
             'biaya_obat_raw' => null,
             'biaya_obat'     => null,

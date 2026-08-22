@@ -133,6 +133,8 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                             <th>Kabupaten</th>
                             <th>Kecamatan</th>
                             <th>Kelurahan</th>
+                            <th class="text-end">Komponen Obat</th>
+                            <th class="text-end">Komponen Tindakan</th>
                             <th class="text-end">Total Biaya</th>
                             <th class="text-center">Aksi</th>
                         </tr>
@@ -141,6 +143,8 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                     <tfoot class="table-light fw-bold">
                         <tr>
                             <td colspan="20" class="text-end">TOTAL HALAMAN INI:</td>
+                            <td class="text-end text-success" id="pageTotalObat">0</td>
+                            <td class="text-end text-info" id="pageTotalTindakan">0</td>
                             <td class="text-end text-primary" id="pageTotal">0</td>
                             <td></td>
                         </tr>
@@ -149,6 +153,67 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
             </div>
         </div>
     </div>
+
+    <?php if (is_ai_active()): ?>
+    <!-- AI DEEP DIVE ADVISOR CONTAINER -->
+    <div class="card bg-dark border-secondary mt-4 shadow-sm mb-4 text-light" id="ai-advisor-container">
+        <div class="card-header bg-gradient bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <span class="fw-bold"><i class="fas fa-brain me-2"></i>Analisis Data Lengkap AI (Executive Insights)</span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAnalisaPrompt">
+                    <i class="fas fa-sliders-h me-1"></i> Tune Prompt
+                </button>
+                <button id="btnAnalyzeAnalisa" class="btn btn-sm btn-success fw-bold">
+                    <i class="fas fa-magic me-1"></i> Jalankan Analisis AI
+                </button>
+            </div>
+        </div>
+        <div class="card-body text-light">
+            <!-- Collapsible Prompt Tuning Area -->
+            <div class="collapse mb-3" id="collapseAnalisaPrompt">
+                <div class="p-3 rounded border border-secondary bg-black bg-opacity-50">
+                    <label class="form-label text-warning small fw-bold">System Prompt (Instruksi Analisis Data Lengkap):</label>
+                    <textarea id="aiAnalisaPrompt" class="form-control form-control-sm bg-dark text-light border-secondary" rows="4">Anda adalah Analis Data Rumah Sakit Senior. Analisis data pendapatan, kunjungan, penjamin, dan rincian transaksi pasien berikut. Identifikasi tren utama, pola kunjungan ralan/ranap, kontribusi penjamin terbesar, serta anomali pembiayaan. Berikan insight eksekutif yang strategis dan rekomendasi aksi dalam Bahasa Indonesia secara terstruktur.</textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted">Setel prompt khusus ini untuk menyesuaikan gaya analisis AI.</small>
+                        <button class="btn btn-xs btn-outline-warning text-warning" onclick="resetAnalisaPrompt()"><i class="fas fa-undo me-1"></i>Reset Prompt Default</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display Container Output -->
+            <div id="aiAnalisaReportContainer" class="p-3 rounded border border-secondary bg-black bg-opacity-25 text-light" style="min-height: 120px; max-height: 500px; overflow-y: auto;">
+                <div class="text-muted small text-center py-4">
+                    <i class="fas fa-robot fa-2x mb-2 text-primary d-block"></i>
+                    Klik tombol <strong>"Jalankan Analisis AI"</strong> di atas untuk memulai analisis cerdas data lengkap secara otomatis.
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
+                <small class="text-muted"><i class="fas fa-info-circle me-1"></i> Analisis mendalam menggunakan sampel data transaksi teratas berdasarkan filter pencarian.</small>
+                <button class="btn btn-sm btn-outline-info" onclick="exportToWord('aiAnalisaReportContainer', 'Laporan_Analisis_Data_Lengkap_AI.doc')">
+                    <i class="fas fa-file-word me-1"></i> Ekspor Laporan ke Word (.doc)
+                </button>
+            </div>
+
+            <!-- AI Interactive Chat Assistant -->
+            <div class="mt-4 pt-3 border-top border-secondary">
+                <h6 class="fw-bold text-info mb-2"><i class="fas fa-comments me-2"></i>Tanya Jawab & Diskusi Transaksi dengan AI Assistant</h6>
+                <div id="analisaChatHistory" class="p-3 rounded border border-secondary bg-black bg-opacity-50 mb-2" style="max-height: 300px; overflow-y: auto; min-height: 100px;">
+                    <div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>
+                </div>
+                <form id="analisaChatForm">
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="analisaChatInput" class="form-control bg-dark text-light border-secondary" placeholder="Tanyakan detail data (misal: Mengapa biaya Ranap bulan ini meningkat tajam?)..." required>
+                        <button class="btn btn-primary" type="submit" id="btnSendAnalisaChat">
+                            <i class="fas fa-paper-plane me-1"></i> Kirim
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
 </div>
 
@@ -203,8 +268,8 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                         columns: ':visible:not(:last-child)',
                         format: {
                             body: function(data, row, column, node) {
-                                // 1. KHUSUS KOLOM RUPIAH (Index 20)
-                                if (column === 20) {
+                                // 1. KHUSUS KOLOM RUPIAH (Index 20, 21, 22)
+                                if (column === 20 || column === 21 || column === 22) {
                                     return typeof data === 'string' ?
                                         data.replace(/\./g, '').replace(',', '.') :
                                         data;
@@ -254,6 +319,8 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                 { "data": "nm_kab" },
                 { "data": "nm_kec" },
                 { "data": "nm_kel" },
+                { "data": "BiayaObat", className: "text-end fw-bold text-success", render: $.fn.dataTable.render.number('.', ',', 0, '') },
+                { "data": "BiayaTindakan", className: "text-end fw-bold text-info", render: $.fn.dataTable.render.number('.', ',', 0, '') },
                 { "data": "TotalBiaya", className: "text-end fw-bold text-primary", render: $.fn.dataTable.render.number('.', ',', 0, '') },
                 { 
                     "data": null, className: "text-center",
@@ -267,10 +334,20 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                 var api = this.api();
                 var intVal = function (i) { return typeof i === 'string' ? i.replace(/[\.,]/g, '') * 1 : typeof i === 'number' ? i : 0; };
                 
-                var pageTotal = api.column(20, { page: 'current' }).data().reduce(function (a, b) {
+                var pageTotalObat = api.column(20, { page: 'current' }).data().reduce(function (a, b) {
                     return intVal(a) + intVal(b);
                 }, 0);
                 
+                var pageTotalTindakan = api.column(21, { page: 'current' }).data().reduce(function (a, b) {
+                    return intVal(a) + intVal(b);
+                }, 0);
+                
+                var pageTotal = api.column(22, { page: 'current' }).data().reduce(function (a, b) {
+                    return intVal(a) + intVal(b);
+                }, 0);
+                
+                $('#pageTotalObat').html(formatRupiah(pageTotalObat));
+                $('#pageTotalTindakan').html(formatRupiah(pageTotalTindakan));
                 $('#pageTotal').html(formatRupiah(pageTotal));
             }
         });
@@ -330,6 +407,336 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
             error: function() { alert("Gagal memuat data."); }
         });
     }
+
+    <?php if (is_ai_active()): ?>
+    // AI Advisor Logic
+    var analisaChatHistoryData = [];
+    var currentAnalisaReportContext = "";
+    const defaultAnalisaPrompt = "Anda adalah Analis Data Rumah Sakit Senior. Analisis data pendapatan, kunjungan, penjamin, dan rincian transaksi pasien berikut. Identifikasi tren utama, pola kunjungan ralan/ranap, kontribusi penjamin terbesar, serta anomali pembiayaan. Berikan insight eksekutif yang strategis dan rekomendasi aksi dalam Bahasa Indonesia secara terstruktur.";
+
+    function resetAnalisaPrompt() {
+        $('#aiAnalisaPrompt').val(defaultAnalisaPrompt);
+    }
+
+    function parseMarkdownToHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/^\s*###\s+(.*?)$/gm, '<h5 class="text-info mt-3 mb-2">$1</h5>')
+            .replace(/^\s*##\s+(.*?)$/gm, '<h4 class="text-primary mt-3 mb-2">$1</h4>')
+            .replace(/^\s*#\s+(.*?)$/gm, '<h3 class="text-primary mt-3 mb-2">$1</h3>')
+            .replace(/^\s*[-*+]\s+(.*?)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*?<\/li>)/gs, '<ul class="mb-2">$1</ul>')
+            .replace(/<\/ul>\s*<ul class="mb-2">/g, '')
+            .replace(/^\s*([^#<>\s\-*+].*?)$/gm, '<p class="mb-2">$1</p>')
+            .replace(/\n\n/g, '<br>');
+    }
+
+    function exportToWord(elementId, fileName) {
+        var content = document.getElementById(elementId).innerHTML;
+        var header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>" +
+                     "<head><meta charset='utf-8'><title>Laporan Ekspor</title>" +
+                     "<style>body { font-family: Arial, sans-serif; line-height: 1.6; } h1, h2, h3 { color: #0284c7; }</style></head><body>";
+        var footer = "</body></html>";
+        
+        var blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'Laporan.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    $(document).on('click', '#btnAnalyzeAnalisa', function() {
+        if (!myTable || !myTable.data().any()) {
+            alert('Silakan tampilkan data terlebih dahulu.');
+            return;
+        }
+
+        var btn = $(this);
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menganalisis...');
+        $('#aiAnalisaReportContainer').html('<div class="text-center py-4"><div class="spinner-border text-info mb-2"></div><div class="small text-muted">AI sedang menganalisis data lengkap...</div></div>');
+
+        // Ambil data transaksi teratas (maks 30 baris - Anti-Truncation)
+        let rowData = [];
+        let dtData = myTable.data().toArray();
+        dtData.sort((a, b) => b.TotalBiaya - a.TotalBiaya);
+        let limit = Math.min(dtData.length, 30); 
+        
+        for(let i = 0; i < limit; i++){
+             rowData.push({
+                 tgl_reg: dtData[i].tgl_registrasi,
+                 tgl_bayar: dtData[i].tgl_byr,
+                 jenis: dtData[i].status_lanjut,
+                 pasien: dtData[i].nm_pasien,
+                 penjamin: dtData[i].png_jawab,
+                 poli: dtData[i].nm_poli,
+                 dokter: dtData[i].nm_dokter,
+                 diagnosa: dtData[i].nm_penyakit,
+                 kabupaten: dtData[i].nm_kab,
+                 kecamatan: dtData[i].nm_kec,
+                 kelurahan: dtData[i].nm_kel,
+                 biaya: dtData[i].TotalBiaya
+             });
+        }
+
+        let contextData = {
+            summary: {
+                total_pendapatan: $('#val-pendapatan').text(),
+                total_kunjungan: $('#val-kunjungan').text(),
+                ralan: $('#val-ralan').text(),
+                ranap: $('#val-ranap').text(),
+                filter: {
+                    tgl_awal: $('#tgl_awal').val(),
+                    tgl_akhir: $('#tgl_akhir').val(),
+                    status_bayar: $('#status_bayar option:selected').text(),
+                    penjamin: $('#kd_pj option:selected').text()
+                }
+            },
+            sample_data: rowData
+        };
+
+        var formData = new URLSearchParams();
+        formData.append('action', 'batch_summary');
+        formData.append('raw_data', JSON.stringify([contextData]));
+        formData.append('custom_prompt', $('#aiAnalisaPrompt').val().trim());
+        formData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullText = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiAnalisaReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#aiAnalisaReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ' + data.message + '</div>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullText += data.choices[0].delta.content;
+                                $('#aiAnalisaReportContainer').html(parseMarkdownToHtml(fullText));
+                            }
+                        } catch(e) {}
+                    } else if (line.startsWith('event: error')) {
+                        isError = true;
+                    }
+                }
+            }
+
+            btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+
+            if (!isError && fullText) {
+                currentAnalisaReportContext = fullText;
+                analisaChatHistoryData = [];
+                $('#analisaChatHistory').html('<div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>');
+            }
+        }).catch(err => {
+            btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+            $('#aiAnalisaReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: Gagal menghubungi server (' + err.message + ')</div>');
+        });
+    });
+
+    $(document).on('submit', '#analisaChatForm', function(e) {
+        e.preventDefault();
+        const input = $('#analisaChatInput');
+        const messageText = input.val().trim();
+        if (!messageText || !currentAnalisaReportContext) return;
+
+        if (analisaChatHistoryData.length === 0) {
+            $('#analisaChatHistory').empty();
+        }
+
+        const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        $('#analisaChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-primary border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-primary"><i class="fas fa-user me-1"></i>Anda</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light">' + parseMarkdownToHtml(messageText) + '</div>' +
+            '</div>'
+        );
+        $('#analisaChatHistory').scrollTop($('#analisaChatHistory')[0].scrollHeight);
+
+        input.val('');
+        $('#analisaChatInput, #btnSendAnalisaChat').prop('disabled', true);
+
+        var replyId = 'analisa_reply_' + Date.now();
+        $('#analisaChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-info border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-info"><i class="fas fa-robot me-1"></i>AI Assistant</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light" id="' + replyId + '"><i class="fas fa-spinner fa-spin text-info me-1"></i> Mengetik...</div>' +
+            '</div>'
+        );
+        $('#analisaChatHistory').scrollTop($('#analisaChatHistory')[0].scrollHeight);
+
+        // Ambil data transaksi teratas (maks 30 baris)
+        let rowData = [];
+        let dtData = myTable.data().toArray();
+        dtData.sort((a, b) => b.TotalBiaya - a.TotalBiaya);
+        let limit = Math.min(dtData.length, 30); 
+        
+        for(let i = 0; i < limit; i++){
+             rowData.push({
+                 tgl_reg: dtData[i].tgl_registrasi,
+                 tgl_bayar: dtData[i].tgl_byr,
+                 jenis: dtData[i].status_lanjut,
+                 pasien: dtData[i].nm_pasien,
+                 penjamin: dtData[i].png_jawab,
+                 poli: dtData[i].nm_poli,
+                 dokter: dtData[i].nm_dokter,
+                 diagnosa: dtData[i].nm_penyakit,
+                 kabupaten: dtData[i].nm_kab,
+                 kecamatan: dtData[i].nm_kec,
+                 kelurahan: dtData[i].nm_kel,
+                 biaya_obat: dtData[i].BiayaObat,
+                 biaya_tindakan: dtData[i].BiayaTindakan,
+                 biaya: dtData[i].TotalBiaya
+             });
+        }
+
+        let contextData = {
+            summary: {
+                total_pendapatan: $('#val-pendapatan').text(),
+                total_kunjungan: $('#val-kunjungan').text(),
+                ralan: $('#val-ralan').text(),
+                ranap: $('#val-ranap').text(),
+                filter: {
+                    tgl_awal: $('#tgl_awal').val(),
+                    tgl_akhir: $('#tgl_akhir').val(),
+                    status_bayar: $('#status_bayar option:selected').text(),
+                    penjamin: $('#kd_pj option:selected').text()
+                }
+            },
+            sample_data: rowData
+        };
+
+        var chatData = new URLSearchParams();
+        chatData.append('action', 'chat_discuss');
+        chatData.append('message', messageText);
+        chatData.append('report_context', currentAnalisaReportContext);
+        chatData.append('raw_data', JSON.stringify([contextData]));
+        chatData.append('custom_prompt', $('#aiAnalisaPrompt').val().trim());
+        chatData.append('history', JSON.stringify(analisaChatHistoryData));
+        chatData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: chatData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullReply = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiAnalisaReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> ' + data.message + '</span>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullReply += data.choices[0].delta.content;
+                                $('#' + replyId).html(parseMarkdownToHtml(fullReply));
+                                $('#analisaChatHistory').scrollTop($('#analisaChatHistory')[0].scrollHeight);
+                            }
+                        } catch(e) {}
+                    } else if (line.startsWith('event: error')) {
+                        isError = true;
+                    }
+                }
+            }
+
+            $('#analisaChatInput, #btnSendAnalisaChat').prop('disabled', false);
+
+            if (!isError && fullReply) {
+                analisaChatHistoryData.push({ role: 'user', content: messageText });
+                analisaChatHistoryData.push({ role: 'assistant', content: fullReply });
+            }
+        }).catch(err => {
+            $('#analisaChatInput, #btnSendAnalisaChat').prop('disabled', false);
+            $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error koneksi</span>');
+        });
+    });
+    <?php endif; ?>
 </script>
 <?php $page_js = ob_get_clean(); ?>
 

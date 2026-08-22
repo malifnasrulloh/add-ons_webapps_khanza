@@ -201,6 +201,67 @@ require_once('includes/header.php');
         </div>
     </div>
 
+    <?php if (is_ai_active()): ?>
+    <!-- AI CASH FLOW ANALYZER CONTAINER -->
+    <div class="card bg-dark border-secondary mt-4 shadow-sm mb-4" id="ai-cf-card" style="display:none;">
+        <div class="card-header bg-gradient bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <span class="fw-bold"><i class="fas fa-brain me-2"></i>Analisis Arus Kas & Likuiditas AI (AI Cash Flow Advisor)</span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCFPrompt">
+                    <i class="fas fa-sliders-h me-1"></i> Tune Prompt
+                </button>
+                <button id="btnAnalyzeCF" class="btn btn-sm btn-success fw-bold">
+                    <i class="fas fa-magic me-1"></i> Jalankan Analisis AI
+                </button>
+            </div>
+        </div>
+        <div class="card-body text-light">
+            <!-- Collapsible Prompt Tuning Area -->
+            <div class="collapse mb-3" id="collapseCFPrompt">
+                <div class="p-3 rounded border border-secondary bg-black bg-opacity-50">
+                    <label class="form-label text-warning small fw-bold">System Prompt (Instruksi Analisis Arus Kas):</label>
+                    <textarea id="aiCFPrompt" class="form-control form-control-sm bg-dark text-light border-secondary" rows="4">Anda adalah AI Cash Flow & Liquidity Advisor (Direktur Keuangan AI) yang ahli. Analisis data laporan arus kas (kas awal, kas masuk/penerimaan, kas keluar/pengeluaran, kas akhir, dan rincian per kategori/akun) berikut. Deteksi tren penurunan likuiditas (cash deficit warning) dan berikan peringatan dini serta rekomendasi strategis mengenai waktu belanja modal/alkes baru atau kapan harus menunda pengeluaran non-prioritas.</textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted">Setel prompt khusus ini untuk menyesuaikan gaya laporan keuangan yang dihasilkan AI.</small>
+                        <button class="btn btn-xs btn-outline-warning text-warning" onclick="resetCFPrompt()"><i class="fas fa-undo me-1"></i>Reset Prompt Default</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display Container Output -->
+            <div id="aiCFReportContainer" class="p-3 rounded border border-secondary bg-black bg-opacity-25 text-light" style="min-height: 120px; max-height: 500px; overflow-y: auto;">
+                <div class="text-muted small text-center py-4">
+                    <i class="fas fa-robot fa-2x mb-2 text-primary d-block"></i>
+                    Klik tombol <strong>"Jalankan Analisis AI"</strong> di atas untuk memproses ringkasan analisis keuangan secara otomatis.
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
+                <small class="text-muted"><i class="fas fa-info-circle me-1"></i> Arus kas dianalisis berdasarkan rentang waktu cutoff terpilih.</small>
+                <button class="btn btn-sm btn-outline-info" onclick="exportToWord('aiCFReportContainer', 'Laporan_Analisis_Arus_Kas_AI.doc')">
+                    <i class="fas fa-file-word me-1"></i> Ekspor Laporan ke Word (.doc)
+                </button>
+            </div>
+
+            <!-- AI Interactive Chat Assistant -->
+            <div class="mt-4 pt-3 border-top border-secondary">
+                <h6 class="fw-bold text-info mb-2"><i class="fas fa-comments me-2"></i>Tanya Jawab & Diskusi Arus Kas dengan AI Assistant</h6>
+                <div id="cfChatHistory" class="p-3 rounded border border-secondary bg-black bg-opacity-50 mb-2" style="max-height: 300px; overflow-y: auto; min-height: 100px;">
+                    <div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>
+                </div>
+                <form id="cfChatForm">
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="cfChatInput" class="form-control bg-dark text-light border-secondary" placeholder="Tanyakan detail cashflow (misal: Mengapa pengeluaran operasional naik bulan ini?)..." required>
+                        <button class="btn btn-primary" type="submit" id="btnSendCFChat">
+                            <i class="fas fa-paper-plane me-1"></i> Kirim
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- BUKU BESAR MODAL -->
     <div class="modal fade" id="bubes-modal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -367,6 +428,9 @@ function renderTable(data) {
     });
 
     document.getElementById('tbl-body').innerHTML = html;
+
+    // Show AI card
+    $('#ai-cf-card').show();
 
     // Chart
     renderChart(data);
@@ -713,6 +777,291 @@ function exportDetailCSV() {
     link.click();
     document.body.removeChild(link);
 }
+
+    // --- AI CASH FLOW ADVISOR JS PIPELINE ---
+    var currentCFReportContext = "";
+    var cfChatHistoryData = [];
+    const defaultCFPromptText = "Anda adalah AI Cash Flow & Liquidity Advisor (Direktur Keuangan AI) yang ahli. Analisis data laporan arus kas (kas awal, kas masuk/penerimaan, kas keluar/pengeluaran, kas akhir, dan rincian per kategori/akun) berikut. Deteksi tren penurunan likuiditas (cash deficit warning) dan berikan peringatan dini serta rekomendasi strategis mengenai waktu belanja modal/alkes baru atau kapan harus menunda pengeluaran non-prioritas.";
+
+    function resetCFPrompt() {
+        $('#aiCFPrompt').val(defaultCFPromptText);
+    }
+
+    function parseMarkdownToHtml(md) {
+        if (!md) return '';
+        return md
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/^### (.*?)$/gm, '<h5 class="fw-bold text-info mt-3">$1</h5>')
+            .replace(/^## (.*?)$/gm, '<h4 class="fw-bold text-primary mt-4 border-bottom border-secondary pb-1">$1</h4>')
+            .replace(/^# (.*?)$/gm, '<h3 class="fw-bold text-primary mt-4">$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/^\s*[-*+]\s+(.*?)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*?<\/li>)/gs, '<ul class="mb-2">$1</ul>')
+            .replace(/<\/ul>\s*<ul class="mb-2">/g, '')
+            .replace(/^\s*([^#<>\s\-*+].*?)$/gm, '<p class="mb-2">$1</p>')
+            .replace(/\n\n/g, '<br>');
+    }
+
+    function exportToWord(elementId, fileName) {
+        var content = document.getElementById(elementId).innerHTML;
+        var header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>" +
+                     "<head><meta charset='utf-8'><title>Laporan Ekspor</title>" +
+                     "<style>body { font-family: Arial, sans-serif; line-height: 1.6; } h1, h2, h3 { color: #0284c7; }</style></head><body>";
+        var footer = "</body></html>";
+        
+        var blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'Laporan.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    $(document).on('click', '#btnAnalyzeCF', function() {
+        if (!_allData || _allData.length === 0) {
+            alert('Silakan tampilkan data laporan arus kas terlebih dahulu.');
+            return;
+        }
+
+        var btn = $(this);
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menganalisis...');
+        $('#aiCFReportContainer').html('<div class="text-center py-4"><div class="spinner-border text-primary mb-2"></div><div class="small text-muted">AI sedang menganalisis arus kas...</div></div>');
+
+        // Slice to 30 records to prevent truncation while ensuring context remains rich
+        var sampleCF = _allData.map(function(item) {
+            return {
+                rekening: item.rekening || '',
+                tipe: item.type || '',
+                jumlah: item.jumlah || 0
+            };
+        });
+
+        var cfRawData = {
+            periode: $('#inp-tgl1').val() + ' s.d ' + $('#inp-tgl2').val(),
+            kpi: {
+                kas_awal: $('#kpi-awal').text(),
+                total_kas_masuk: $('#kpi-masuk').text(),
+                total_kas_keluar: $('#kpi-keluar').text(),
+                total_kas_akhir: $('#kpi-total').text()
+            },
+            sample_data: sampleCF
+        };
+
+        var formData = new URLSearchParams();
+        formData.append('action', 'batch_summary');
+        formData.append('raw_data', JSON.stringify([cfRawData]));
+        formData.append('custom_prompt', $('#aiCFPrompt').val().trim());
+        formData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullText = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiCFReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#aiCFReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ' + data.message + '</div>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullText += data.choices[0].delta.content;
+                                $('#aiCFReportContainer').html(parseMarkdownToHtml(fullText));
+                            }
+                        } catch(e) {}
+                    } else if (line.startsWith('event: error')) {
+                        isError = true;
+                    }
+                }
+            }
+
+            btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+
+            if (!isError && fullText) {
+                currentCFReportContext = fullText;
+                cfChatHistoryData = [];
+                $('#cfChatHistory').html('<div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>');
+            }
+        }).catch(err => {
+            btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+            $('#aiCFReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: Gagal menghubungi server (' + err.message + ')</div>');
+        });
+    });
+
+    $(document).on('submit', '#cfChatForm', function(e) {
+        e.preventDefault();
+        const input = $('#cfChatInput');
+        const messageText = input.val().trim();
+        if (!messageText || !currentCFReportContext) return;
+
+        if (cfChatHistoryData.length === 0) {
+            $('#cfChatHistory').empty();
+        }
+
+        const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        $('#cfChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-primary border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-primary"><i class="fas fa-user me-1"></i>Anda</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light">' + parseMarkdownToHtml(messageText) + '</div>' +
+            '</div>'
+        );
+        $('#cfChatHistory').scrollTop($('#cfChatHistory')[0].scrollHeight);
+
+        input.val('');
+        $('#cfChatInput, #btnSendCFChat').prop('disabled', true);
+
+        var replyId = 'cf_reply_' + Date.now();
+        $('#cfChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-info border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-info"><i class="fas fa-robot me-1"></i>AI CFO Assistant</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light" id="' + replyId + '"><i class="fas fa-spinner fa-spin text-info me-1"></i> Mengetik...</div>' +
+            '</div>'
+        );
+        $('#cfChatHistory').scrollTop($('#cfChatHistory')[0].scrollHeight);
+
+        var sampleCF = _allData.map(function(item) {
+            return {
+                rekening: item.rekening || '',
+                tipe: item.type || '',
+                jumlah: item.jumlah || 0
+            };
+        });
+
+        var cfRawData = {
+            periode: $('#inp-tgl1').val() + ' s.d ' + $('#inp-tgl2').val(),
+            kpi: {
+                kas_awal: $('#kpi-awal').text(),
+                total_kas_masuk: $('#kpi-masuk').text(),
+                total_kas_keluar: $('#kpi-keluar').text(),
+                total_kas_akhir: $('#kpi-total').text()
+            },
+            sample_data: sampleCF
+        };
+
+        var chatData = new URLSearchParams();
+        chatData.append('action', 'chat_discuss');
+        chatData.append('message', messageText);
+        chatData.append('report_context', currentCFReportContext);
+        chatData.append('raw_data', JSON.stringify([cfRawData]));
+        chatData.append('custom_prompt', $('#aiCFPrompt').val().trim());
+        chatData.append('history', JSON.stringify(cfChatHistoryData));
+        chatData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: chatData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullReply = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiCFReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> ' + data.message + '</span>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullReply += data.choices[0].delta.content;
+                                $('#' + replyId).html(parseMarkdownToHtml(fullReply));
+                                $('#cfChatHistory').scrollTop($('#cfChatHistory')[0].scrollHeight);
+                            }
+                        } catch(e) {}
+                    } else if (line.startsWith('event: error')) {
+                        isError = true;
+                    }
+                }
+            }
+
+            $('#cfChatInput, #btnSendCFChat').prop('disabled', false);
+
+            if (!isError && fullReply) {
+                cfChatHistoryData.push({ role: 'user', content: messageText });
+                cfChatHistoryData.push({ role: 'assistant', content: fullReply });
+            }
+        }).catch(err => {
+            $('#cfChatInput, #btnSendCFChat').prop('disabled', false);
+            $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error koneksi</span>');
+        });
+    });
 
 document.addEventListener('DOMContentLoaded', function() {
     // Auto-load untuk tahun ini

@@ -74,6 +74,8 @@ $sql = "
         kabupaten.nm_kab,
         kecamatan.nm_kec,
         kelurahan.nm_kel,
+        b.BiayaObat,
+        b.BiayaTindakan,
         b.TotalBiaya
     FROM
         reg_periksa
@@ -82,7 +84,22 @@ $sql = "
     INNER JOIN (
         SELECT 
             no_rawat, 
-            SUM(totalbiaya) AS TotalBiaya,
+            SUM(CASE 
+                WHEN status = 'TtlRetur Obat' THEN (totalbiaya * -1)
+                WHEN status = 'TtlPotongan' THEN (totalbiaya * -1)
+                ELSE totalbiaya 
+            END) AS TotalBiaya,
+            SUM(CASE 
+                WHEN status IN ('Obat', 'TtlObat', 'Resep Pulang', 'TtlResep Pulang') THEN totalbiaya
+                WHEN status = 'Retur Obat' THEN totalbiaya
+                WHEN status = 'TtlRetur Obat' THEN (totalbiaya * -1)
+                ELSE 0 
+            END) AS BiayaObat,
+            SUM(CASE 
+                WHEN status IN ('Kamar', 'TtlKamar', 'Potongan', 'TtlPotongan') THEN 0
+                WHEN status IN ('Obat', 'TtlObat', 'Resep Pulang', 'TtlResep Pulang', 'Retur Obat', 'TtlRetur Obat') THEN 0
+                ELSE totalbiaya 
+            END) AS BiayaTindakan,
             MAX(tgl_byr) AS tgl_byr
         FROM billing
         WHERE tgl_byr BETWEEN ? AND ?

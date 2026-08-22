@@ -2,7 +2,7 @@
     {
         "id": "grp_biaya",
         "is_group": true,
-        "title": "📉 Kendali Biaya",
+        "title": "📈 Kendali Biaya",
         "is_active": true,
         "items": [
             {
@@ -148,7 +148,6 @@
                     }
                 ]
             }
-
         ]
     },
     {
@@ -212,6 +211,24 @@
                 "title": "Antrean Online BPJS",
                 "icon": "fas fa-mobile-alt",
                 "is_active": true
+            },
+            {
+                "url": "laporan_penunjang.php",
+                "title": "Penunjang Medis",
+                "icon": "fas fa-flask",
+                "is_active": true
+            },
+            {
+                "url": "laporan_rujukan.php",
+                "title": "Rujukan Masuk",
+                "icon": "fas fa-ambulance",
+                "is_active": true
+            },
+            {
+                "url": "laporan_gizi.php",
+                "title": "Gizi & Diet Pasien",
+                "icon": "fas fa-utensils",
+                "is_active": true
             }
         ]
     },
@@ -269,6 +286,12 @@
                 "url": "laporan_dead_stock.php",
                 "title": "Dead Stock Obat",
                 "icon": "fas fa-skull-crossbones",
+                "is_active": true
+            },
+            {
+                "url": "laporan_pengadaan.php",
+                "title": "Pengadaan & Vendor",
+                "icon": "fas fa-truck",
                 "is_active": true
             }
         ]

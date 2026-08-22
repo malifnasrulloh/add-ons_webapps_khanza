@@ -30,6 +30,9 @@ try {
         kel.nm_kel, 
         kec.nm_kec, 
         kab.nm_kab,
+        rp.status_lanjut,
+        p.jk,
+        pl.nm_poli,
         COUNT(rp.no_rawat) as total_kunjungan,
         SUM(CASE WHEN rp.status_poli = 'Baru' THEN 1 ELSE 0 END) as kunjungan_baru,
         SUM(CASE WHEN rp.status_poli = 'Lama' THEN 1 ELSE 0 END) as kunjungan_lama
@@ -38,6 +41,7 @@ try {
     INNER JOIN kelurahan kel ON p.kd_kel = kel.kd_kel
     INNER JOIN kecamatan kec ON p.kd_kec = kec.kd_kec
     INNER JOIN kabupaten kab ON p.kd_kab = kab.kd_kab
+    LEFT JOIN poliklinik pl ON rp.kd_poli = pl.kd_poli
     WHERE rp.stts <> 'Batal' 
       AND rp.tgl_registrasi BETWEEN :tgl_awal AND :tgl_akhir";
 
@@ -51,8 +55,8 @@ try {
         $params[':kd_pj'] = $kd_pj;
     }
 
-    // Group By Kelurahan (paling spesifik)
-    $sql .= " GROUP BY kel.kd_kel, kel.nm_kel, kec.kd_kec, kec.nm_kec, kab.kd_kab, kab.nm_kab
+    // Group By Kelurahan and additional details
+    $sql .= " GROUP BY kel.kd_kel, kel.nm_kel, kec.kd_kec, kec.nm_kec, kab.kd_kab, kab.nm_kab, rp.status_lanjut, p.jk, pl.nm_poli
               ORDER BY total_kunjungan DESC";
 
     $stmt = $koneksi_pdo->prepare($sql);
@@ -77,6 +81,9 @@ try {
             'nm_kel' => $row['nm_kel'],
             'nm_kec' => $row['nm_kec'],
             'nm_kab' => $row['nm_kab'],
+            'status_lanjut' => $row['status_lanjut'],
+            'jk' => $row['jk'] === 'L' ? 'Laki-laki' : ($row['jk'] === 'P' ? 'Perempuan' : '-'),
+            'nm_poli' => $row['nm_poli'] ? $row['nm_poli'] : '-',
             'baru' => $baru,
             'lama' => $lama,
             'total' => $jml

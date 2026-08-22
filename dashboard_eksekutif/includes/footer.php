@@ -21,6 +21,13 @@
             <span>Log Sistem</span>
         </a>
         
+<?php
+$_ks_lf = dirname(__DIR__) . '/config/.license_active';
+$_ks_licensed = file_exists($_ks_lf) && hash('sha256', trim(@file_get_contents($_ks_lf))) === '58f75d8e127b99616f9a178b7626a8afea758ef2656eb91cb42f4309857d7624';
+unset($_ks_lf);
+?>
+
+        <?php if (!$_ks_licensed): ?>
          <a id="dev-saweria-link"
            href="https://saweria.co/ichsanleonhart" 
            target="_blank" 
@@ -30,6 +37,7 @@
             <i class="fas fa-coffee"></i>
             <span>Donasi via Saweria</span>
         </a>
+        <?php endif; ?>
 
         <a href="https://wa.me/6285726123777"
            target="_blank"
@@ -51,6 +59,7 @@
 
     </div>
 
+    <?php if (!$_ks_licensed): ?>
     <div class="dev-qris-wrap" tabindex="0" role="button" aria-label="Klik untuk lihat QRIS donasi">        
         <img id="dev-qris-img"
              src="https://raw.githubusercontent.com/ichsanleonhart/add-ons_webapps_khanza/main/qris-ichsan.png"
@@ -66,6 +75,7 @@
             <p>Scan untuk Donasi 🙏<br><small style="color:#888">Terima kasih atas dukungannya!</small></p>
         </div>
     </div>
+    <?php endif; ?>
 
 </div>
 <!-- ===== END DEVELOPER CREDIT BAR ===== -->
@@ -77,6 +87,10 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <!-- Bootstrap Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- Select2 -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <!-- DataTables -->
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
@@ -161,49 +175,78 @@ window.hideGlobalLoading = function() { $('#globalLoadingOverlay').fadeOut(200);
 if (isset($page_js)) {
     echo $page_js;
 }
-?>
-<?php
-$_ks_js = "
+?><?php
+// MODE 1: Tanpa lisensi — jaga semua elemen termasuk Saweria/QRIS
+// MODE 2: Lisensi valid — Saweria/QRIS boleh absen, tapi nama/WA/TG tetap dijaga
+if (!$_ks_licensed):
+    $_ks_js = "
 (function(){
     'use strict';
-    setInterval(function(){
-        var a = document.getElementById('dev-saweria-link');
-        var b = document.getElementById('dev-qris-img');
-        var c = document.querySelector('.dev-name');
-        var d = document.querySelector('.dev-link-wa');
-        var e = document.querySelector('.dev-link-tg');
-
-        // Pengecekan Eksistensi Dasar
-        if (!a || !b || !c || !d || !e) { document.body.innerHTML = ''; return; }
-
-        // Pengecekan Integritas Konten (Atribut & Text)
-        var s_sw = atob('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA==');
-        var s_wa = atob('NjI4NTcyNjEyMzc3Nw==');
-        var s_nm = atob('SWNoc2FuIExlb25oYXJ0');
-        var s_qr = atob('cXJpcy1pY2hzYW4ucG5n');
-
-        var mutation = (
-            !a.getAttribute('href').includes(s_sw) ||
-            !d.getAttribute('href').includes(s_wa) ||
-            !e.getAttribute('href').includes('IchsanLeonhart') ||
-            !b.getAttribute('src').includes(s_qr) ||
-            c.innerText.trim() !== s_nm
-        );
-
-        // Pengecekan Visibilitas (display:none, opacity:0)
-        var sa = window.getComputedStyle(a);
-        var sb = window.getComputedStyle(b);
-        var hidden = (sa.display === 'none' || sa.visibility === 'hidden' || parseFloat(sa.opacity) < 0.05 ||
-                      sb.display === 'none' || sb.visibility === 'hidden' || parseFloat(sb.opacity) < 0.05);
-
-        if (mutation || hidden) {
-            // Curang = BLANK PAGE
-            document.body.innerHTML = '';
-        }
-    }, 2000);
+    function _ks_init(){
+        setInterval(function(){
+            var a = document.getElementById('dev-saweria-link');
+            var b = document.getElementById('dev-qris-img');
+            var c = document.querySelector('.dev-name');
+            var d = document.querySelector('.dev-link-wa');
+            var e = document.querySelector('.dev-link-tg');
+            if (!a || !b || !c || !d || !e) { document.body.innerHTML = ''; return; }
+            var s_sw = atob('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA==');
+            var s_wa = atob('NjI4NTcyNjEyMzc3Nw==');
+            var s_nm = atob('SWNoc2FuIExlb25oYXJ0');
+            var s_qr = atob('cXJpcy1pY2hzYW4ucG5n');
+            var mutation = (
+                !a.getAttribute('href').includes(s_sw) ||
+                !d.getAttribute('href').includes(s_wa) ||
+                !e.getAttribute('href').includes('IchsanLeonhart') ||
+                !b.getAttribute('src').includes(s_qr) ||
+                c.innerText.trim() !== s_nm
+            );
+            var sa = window.getComputedStyle(a);
+            var sb = window.getComputedStyle(b);
+            var hidden = (sa.display === 'none' || sa.visibility === 'hidden' || parseFloat(sa.opacity) < 0.05 ||
+                          sb.display === 'none' || sb.visibility === 'hidden' || parseFloat(sb.opacity) < 0.05);
+            if (mutation || hidden) { document.body.innerHTML = ''; }
+        }, 2000);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _ks_init);
+    } else {
+        _ks_init();
+    }
 })();
 ";
-echo '<script>eval(atob("' . base64_encode($_ks_js) . '"));</' . 'script>';
+    echo '<script>eval(atob("' . base64_encode($_ks_js) . '"));</' . 'script>';
+else:
+    $_ks_js = "
+(function(){
+    'use strict';
+    function _ks_init(){
+        setInterval(function(){
+            var c = document.querySelector('.dev-name');
+            var d = document.querySelector('.dev-link-wa');
+            var e = document.querySelector('.dev-link-tg');
+            if (!c || !d || !e) { document.body.innerHTML = ''; return; }
+            var s_wa = atob('NjI4NTcyNjEyMzc3Nw==');
+            var s_nm = atob('SWNoc2FuIExlb25oYXJ0');
+            var mutation = (
+                !d.getAttribute('href').includes(s_wa) ||
+                !e.getAttribute('href').includes('IchsanLeonhart') ||
+                c.innerText.trim() !== s_nm
+            );
+            var sc = window.getComputedStyle(c);
+            var hidden = (sc.display === 'none' || sc.visibility === 'hidden' || parseFloat(sc.opacity) < 0.05);
+            if (mutation || hidden) { document.body.innerHTML = ''; }
+        }, 2000);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _ks_init);
+    } else {
+        _ks_init();
+    }
+})();
+";
+    echo '<script>eval(atob("' . base64_encode($_ks_js) . '"));</' . 'script>';
+endif;
 ?>
 
 <div class="modal fade" id="devMessageModal" tabindex="-1" aria-labelledby="devMessageModalLabel" aria-hidden="true">
@@ -253,12 +296,14 @@ echo '<script>eval(atob("' . base64_encode($_ks_js) . '"));</' . 'script>';
       </div>
       <div class="modal-footer border-0 d-flex justify-content-between align-items-center">
         <div class="d-flex gap-2 flex-wrap">
+            <?php if (!$_ks_licensed): ?>
             <a href="https://saweria.co/ichsanleonhart" target="_blank" class="btn btn-warning fw-bold shadow-sm d-flex align-items-center" style="border-radius: 12px; font-size: 0.85rem; background: linear-gradient(135deg, #ff6b6b, #ffa500); color: white; border: none;">
                 <i class="fas fa-gift me-2 text-white"></i>Saweria
             </a>
             <button type="button" class="btn fw-bold shadow-sm d-flex align-items-center text-white" style="border-radius: 12px; font-size: 0.85rem; background: linear-gradient(135deg, #4facfe, #00f2fe); border: none;" data-bs-toggle="collapse" data-bs-target="#qrisCollapseModal" aria-expanded="false" aria-controls="qrisCollapseModal">
                 <i class="fas fa-qrcode me-2 text-white"></i>QRIS
             </button>
+            <?php endif; ?>
         </div>
         <button type="button" class="btn btn-secondary shadow-sm" style="border-radius: 12px; font-size: 0.85rem;" data-bs-dismiss="modal">Tutup</button>
       </div>
@@ -414,12 +459,35 @@ document.addEventListener("DOMContentLoaded", function() {
         btnPrint.addEventListener('click', function() {
             var content = document.getElementById('guideAccordion').innerHTML;
             var printWindow = window.open('', '_blank');
-            printWindow.document.write('<html><head><title>Panduan Pengguna Dashboard</title>');
+            printWindow.document.write('<html><head><title>Buku Sakti: Panduan Pengguna Dashboard Eksekutif</title>');
             printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">');
-            printWindow.document.write('<style>body{padding:40px; font-family: sans-serif;} .accordion-button:after{display:none;} .accordion-collapse{display:block !important;} .accordion-item{border:1px solid #eee !important; margin-bottom:30px !important; box-shadow:none !important;} .accordion-button{background:#f8f9fa !important; color:#000 !important; cursor:default !important; font-size: 1.2rem; border-bottom: 2px solid #0d6efd !important;} img{max-width:100% !important; height:auto; display:block; margin: 20px auto;} .text-primary{color: #0d6efd !important;}</style>');
+            printWindow.document.write('<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">');
+            printWindow.document.write('<style>' +
+                'body { padding: 40px; font-family: "Inter", sans-serif; color: #1e293b; background-color: #ffffff; line-height: 1.6; }' +
+                '.print-cover { background: linear-gradient(135deg, #1e3a8a, #0f172a); color: white; padding: 60px 40px; border-radius: 16px; margin-bottom: 50px; text-align: center; page-break-after: always; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }' +
+                '.print-cover h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 15px; }' +
+                '.print-cover h3 { font-size: 1.5rem; font-weight: 600; color: #3b82f6; margin-bottom: 20px; }' +
+                '.print-cover p { color: #94a3b8; font-size: 1rem; }' +
+                '.accordion-item { border: none !important; margin-bottom: 50px !important; box-shadow: none !important; page-break-before: always; }' +
+                '.accordion-button { background: linear-gradient(135deg, #1e3a8a, #2563eb) !important; color: white !important; cursor: default !important; font-size: 1.4rem !important; font-weight: 700 !important; border-radius: 12px !important; padding: 18px 24px !important; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15) !important; border: none !important; }' +
+                '.accordion-button:after { display: none !important; }' +
+                '.accordion-collapse { display: block !important; padding: 30px 10px !important; }' +
+                'img { max-width: 100% !important; height: auto; display: block; margin: 30px auto; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important; }' +
+                'blockquote { border-left: 4px solid #2563eb !important; background-color: #f8fafc !important; padding: 15px 20px !important; font-style: italic; border-radius: 0 8px 8px 0; margin: 20px 0 !important; color: #475569 !important; }' +
+                '.alert { border-left: 4px solid #0ea5e9 !important; background-color: #f0f9ff !important; border-top: none !important; border-right: none !important; border-bottom: none !important; border-radius: 0 12px 12px 0 !important; padding: 15px 20px !important; color: #0369a1 !important; }' +
+                '.text-primary { color: #2563eb !important; }' +
+                '</style>');
             printWindow.document.write('</head><body>');
             printWindow.document.write('<div class="container">');
-            printWindow.document.write('<h1 class="text-center mb-5 pb-3 border-bottom">Panduan Pengguna Dashboard Eksekutif</h1>');
+            
+            // Generate Cover Page
+            printWindow.document.write('<div class="print-cover">');
+            printWindow.document.write('  <h1>BUKU SAKTI PANDUAN PENGGUNA</h1>');
+            printWindow.document.write('  <h3>Dashboard Eksekutif & Generative AI Analytics</h3>');
+            printWindow.document.write('  <p class="mb-0">Laporan Resmi Petunjuk Teknis & Penggunaan Sistem untuk Direksi & Manajemen</p>');
+            printWindow.document.write('</div>');
+            
+            // Append Accordion Content
             printWindow.document.write(content);
             printWindow.document.write('</div>');
             printWindow.document.write('</body></html>');

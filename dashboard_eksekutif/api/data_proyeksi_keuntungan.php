@@ -19,6 +19,7 @@ $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 $status_bayar = isset($_GET['status_bayar']) ? $_GET['status_bayar'] : '';
 $kd_pj = isset($_GET['kd_pj']) ? $_GET['kd_pj'] : '';
+$status_lanjut = isset($_GET['status_lanjut']) ? $_GET['status_lanjut'] : '';
 
 // Init Summary
 $summary = [
@@ -44,6 +45,9 @@ if ($status_bayar == 'Lunas') {
 if (!empty($kd_pj)) {
     $filter_pasien .= " AND reg_periksa.kd_pj = '$kd_pj' ";
 }
+if (!empty($status_lanjut)) {
+    $filter_pasien .= " AND reg_periksa.status_lanjut = '$status_lanjut' ";
+}
 
 $sql_pasien = "
     SELECT 
@@ -57,12 +61,49 @@ $sql_pasien = "
         dpo.h_beli,
         dpo.total as subtotal_jual, 
         (dpo.h_beli * dpo.jml) as subtotal_modal,
-        (dpo.total - (dpo.h_beli * dpo.jml)) as profit
+        (dpo.total - (dpo.h_beli * dpo.jml)) as profit,
+        CASE 
+            WHEN reg_periksa.status_lanjut = 'Ranap' THEN (
+                SELECT b.nm_bangsal 
+                FROM kamar_inap ki 
+                INNER JOIN kamar k ON ki.kd_kamar = k.kd_kamar 
+                INNER JOIN bangsal b ON k.kd_bangsal = b.kd_bangsal 
+                WHERE ki.no_rawat = dpo.no_rawat 
+                ORDER BY ki.tgl_masuk DESC, ki.jam_masuk DESC 
+                LIMIT 1
+            )
+            ELSE poliklinik.nm_poli 
+        END AS asal_resep,
+        COALESCE(
+            (
+                SELECT d.nm_dokter 
+                FROM resep_obat ro 
+                INNER JOIN dokter d ON ro.kd_dokter = d.kd_dokter 
+                WHERE ro.no_rawat = dpo.no_rawat 
+                  AND ro.tgl_perawatan = dpo.tgl_perawatan 
+                LIMIT 1
+            ),
+            (
+                SELECT d.nm_dokter 
+                FROM resep_obat ro 
+                INNER JOIN dokter d ON ro.kd_dokter = d.kd_dokter 
+                WHERE ro.no_rawat = dpo.no_rawat 
+                LIMIT 1
+            ),
+            (
+                SELECT d.nm_dokter 
+                FROM dokter d 
+                INNER JOIN reg_periksa rp ON d.kd_dokter = rp.kd_dokter 
+                WHERE rp.no_rawat = dpo.no_rawat 
+                LIMIT 1
+            )
+        ) AS dokter_peresep
     FROM detail_pemberian_obat dpo
     INNER JOIN reg_periksa ON dpo.no_rawat = reg_periksa.no_rawat
     INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
     INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj
     INNER JOIN databarang ON dpo.kode_brng = databarang.kode_brng
+    LEFT JOIN poliklinik ON reg_periksa.kd_poli = poliklinik.kd_poli
     WHERE dpo.tgl_perawatan BETWEEN ? AND ?
     $filter_pasien
     ORDER BY dpo.tgl_perawatan DESC, dpo.jam DESC
@@ -100,7 +141,7 @@ if ($stmt) {
 // 2. QUERY PENJUALAN BEBAS (APOTEK/TOKO)
 // =================================================================================
 $data_bebas = [];
-if (empty($kd_pj) && $status_bayar != 'Piutang') { 
+if (empty($kd_pj) && $status_bayar != 'Piutang' && $status_lanjut != 'Ranap') { 
     $sql_bebas = "
         SELECT 
             penjualan.tgl_jual as tanggal,

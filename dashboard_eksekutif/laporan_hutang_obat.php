@@ -1,6 +1,7 @@
 <?php
 $page_title = "Laporan Hutang Obat Belum Lunas";
 require_once('includes/header.php');
+require_once('includes/functions.php');
 ?>
 
 <style>
@@ -117,6 +118,71 @@ require_once('includes/header.php');
             </div>
         </div>
     </div>
+
+    <?php if (is_ai_active()): ?>
+    <!-- AI HUTANG ADVISOR CONTAINER -->
+    <div class="card bg-dark border-secondary mt-4 shadow-sm mb-4">
+        <div class="card-header bg-gradient bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <span class="fw-bold"><i class="fas fa-brain me-2"></i>Analisis Proyeksi & Arus Kas Hutang AI (CFO Advisor)</span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHutangPrompt">
+                    <i class="fas fa-sliders-h me-1"></i> Tune Prompt
+                </button>
+                <button id="btnAnalyzeHutang" class="btn btn-sm btn-success fw-bold" onclick="analyzeHutangData()">
+                    <i class="fas fa-magic me-1"></i> Jalankan Analisis AI
+                </button>
+            </div>
+        </div>
+        <div class="card-body text-light">
+            <!-- Collapsible Prompt Tuning Area -->
+            <div class="collapse mb-3" id="collapseHutangPrompt">
+                <div class="p-3 rounded border border-secondary bg-black bg-opacity-50">
+                    <label class="form-label text-warning small fw-bold">System Prompt (Instruksi Analisis Hutang & Arus Kas):</label>
+                    <textarea id="aiHutangPrompt" class="form-control form-control-sm bg-dark text-light border-secondary" rows="4">Anda adalah Konsultan Keuangan Rumah Sakit (CFO) & Auditor Keuangan Senior. Analisis data faktur obat belum lunas, lalu susun Laporan Naratif Eksekutif dalam Bahasa Indonesia yang berfokus pada:
+1. Beban Jatuh Tempo Terkini: Analisis total nominal yang mendekati atau telah lewat jatuh tempo.
+2. Prioritas Pembayaran: Daftar suplier utama dengan tunggakan terbesar dan faktur penting yang harus segera dilunasi.
+3. Rekomendasi Cash Flow: Strategi alokasi dana dan negosiasi perpanjangan tempo/cicilan suplier untuk menjaga likuiditas RS.
+4. Mitigasi Risiko: Tindakan preventif agar tidak terjadi kekosongan stok obat akibat pemblokiran kiriman oleh suplier yang hutangnya tertunggak.</textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted">Setel prompt khusus ini untuk menyesuaikan arah analisis keuangan Anda.</small>
+                        <button class="btn btn-xs btn-outline-warning text-warning" onclick="resetHutangPrompt()"><i class="fas fa-undo me-1"></i>Reset Prompt Default</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display Container Output -->
+            <div id="aiHutangReportContainer" class="p-3 rounded border border-secondary bg-black bg-opacity-25 text-light" style="min-height: 120px; max-height: 500px; overflow-y: auto;">
+                <div class="text-muted small text-center py-4">
+                    <i class="fas fa-robot fa-2x mb-2 text-primary d-block"></i>
+                    Klik tombol <strong>"Jalankan Analisis AI"</strong> di atas untuk memproses proyeksi risiko hutang dan arus kas farmasi secara otomatis.
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
+                <small class="text-muted"><i class="fas fa-info-circle me-1"></i> Analisis didasarkan pada sisa hutang dan tanggal jatuh tempo faktur saat ini.</small>
+                <button class="btn btn-sm btn-outline-info" onclick="exportToWord('aiHutangReportContainer', 'Laporan_Analisis_Hutang_Obat_AI.doc')">
+                    <i class="fas fa-file-word me-1"></i> Ekspor Laporan ke Word (.doc)
+                </button>
+            </div>
+
+            <!-- AI Interactive Chat Assistant -->
+            <div class="mt-4 pt-3 border-top border-secondary">
+                <h6 class="fw-bold text-info mb-2"><i class="fas fa-comments me-2"></i>Tanya Jawab & Diskusi Hutang dengan AI Assistant</h6>
+                <div id="hutangChatHistory" class="p-3 rounded border border-secondary bg-black bg-opacity-50 mb-2" style="max-height: 300px; overflow-y: auto; min-height: 100px;">
+                    <div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>
+                </div>
+                <form id="hutangChatForm">
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="hutangChatInput" class="form-control bg-dark text-light border-secondary" placeholder="Tanyakan detail (misal: Suplier mana yang memiliki jatuh tempo terdekat dengan nominal terbesar?)..." required>
+                        <button class="btn btn-primary" type="submit" id="btnSendHutangChat">
+                            <i class="fas fa-paper-plane me-1"></i> Kirim
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- DataTables Rincian Faktur -->
     <div class="card shadow mb-4">
@@ -410,7 +476,7 @@ require_once('includes/header.php');
         // --- Pie Chart (Proporsi Suplier) ---
         // Sort and get top 5 suplier, others merged to "Lainnya"
         let sortedSupliers = chartData.suplier.sort((a,b) => b.value - a.value);
-        let topSupliers = sortedSupliers.slice(0, 5);
+        let topSupliers = sortedSupliers;
         let othersValue = sortedSupliers.slice(5).reduce((acc, curr) => acc + curr.value, 0);
         
         if (othersValue > 0) {
@@ -460,6 +526,264 @@ require_once('includes/header.php');
             }
         });
     }
+
+    <?php if(is_ai_active()): ?>
+    var hutangChatHistoryData = [];
+    var currentHutangReportContext = "";
+    const defaultHutangPrompt = "Anda adalah Konsultan Keuangan Rumah Sakit (CFO) & Auditor Keuangan Senior. Analisis data faktur obat belum lunas, lalu susun Laporan Naratif Eksekutif dalam Bahasa Indonesia yang berfokus pada:\n1. Beban Jatuh Tempo Terkini: Analisis total nominal yang mendekati atau telah lewat jatuh tempo.\n2. Prioritas Pembayaran: Daftar suplier utama dengan tunggakan terbesar dan faktur penting yang harus segera dilunasi.\n3. Rekomendasi Cash Flow: Strategi alokasi dana dan negosiasi perpanjangan tempo/cicilan suplier untuk menjaga likuiditas RS.\n4. Mitigasi Risiko: Tindakan preventif agar tidak terjadi kekosongan stok obat akibat pemblokiran kiriman oleh suplier yang hutangnya tertunggak.";
+
+    function resetHutangPrompt() {
+        $('#aiHutangPrompt').val(defaultHutangPrompt);
+    }
+
+    async function analyzeHutangData() {
+        const btn = document.getElementById('btnAnalyzeHutang');
+        const responseDiv = document.getElementById('aiHutangReportContainer');
+        const customPrompt = document.getElementById('aiHutangPrompt').value;
+
+        if (!tableHutang || !tableHutang.data().any()) {
+            Swal.fire('Data Kosong', 'Tidak ada data hutang untuk dianalisis. Silakan klik Refresh Data terlebih dahulu.', 'info');
+            return;
+        }
+
+        // Kumpulkan data chart/KPI untuk konteks
+        const totalHutang = $('#kpi-total-hutang').text();
+        const totalFaktur = $('#kpi-total-faktur').text();
+        const lewatTempo = $('#kpi-lewat-tempo').text();
+        
+        currentHutangReportContext = "Laporan Hutang Obat Belum Lunas.\n" +
+                                     "Total Hutang Keseluruhan: " + totalHutang + "\n" +
+                                     "Total Faktur: " + totalFaktur + "\n" +
+                                     "Lewat Jatuh Tempo (Telat): " + lewatTempo + "\n\nData Rincian:\n";
+
+        // Ambil data tabel
+        let dtData = tableHutang.data().toArray();
+        dtData.sort((a,b) => b.sisa_hutang_val - a.sisa_hutang_val);
+        let sampleData = dtData; // Batasi 30 data terbesar agar tidak memotong respons token LLM (Anti-Truncation)
+
+        sampleData.forEach(row => {
+            currentHutangReportContext += `- Faktur ${row.no_faktur} dari ${row.nama_suplier}. Jatuh tempo: ${row.tgl_tempo}. Sisa Hutang: ${formatRupiah(row.sisa_hutang_val)}\n`;
+        });
+
+        // UI Updates
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menganalisis...';
+        responseDiv.innerHTML = '<div class="d-flex align-items-center"><div class="spinner-border spinner-border-sm text-info me-2"></div><em>AI sedang mempelajari data hutang Anda...</em></div>';
+
+        // Panggil API Gateway secara streaming
+        try {
+            var requestData = new URLSearchParams();
+            requestData.append('action', 'batch_summary');
+            requestData.append('raw_data', JSON.stringify(sampleData));
+            requestData.append('custom_prompt', customPrompt);
+            requestData.append('stream', '1');
+
+            const response = await fetch('api/ai_analyzer.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: requestData
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let aiText = '';
+            let buffer = "";
+
+            responseDiv.innerHTML = ''; // bersihkan div
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    if (line.startsWith('data: ')) {
+                        const jsonStr = line.substring(6).trim();
+                        if (jsonStr === '[DONE]') continue;
+                        
+                        try {
+                            const chunk = JSON.parse(jsonStr);
+                            if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta && chunk.choices[0].delta.content) {
+                                aiText += chunk.choices[0].delta.content;
+                            } else if (chunk.candidates && chunk.candidates.length > 0 && chunk.candidates[0].content && chunk.candidates[0].content.parts && chunk.candidates[0].content.parts[0].text) {
+                                aiText += chunk.candidates[0].content.parts[0].text;
+                            }
+                            
+                            if (typeof parseMarkdownBody === 'function') {
+                                responseDiv.innerHTML = parseMarkdownBody(aiText);
+                            } else {
+                                responseDiv.innerText = aiText;
+                            }
+                        } catch (e) {}
+                    } else if (line.trim().startsWith('{"status":"error"')) {
+                        try {
+                            const errData = JSON.parse(line.trim());
+                            responseDiv.innerHTML = '<div class="alert alert-danger">' + errData.message + '</div>';
+                        } catch(e) {}
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('AI Error:', error);
+            responseDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Gagal menghubungi AI Server.</div>';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic me-1"></i> Jalankan Analisis AI';
+        }
+    }
+
+    // Handle Chat Discussion
+    $(document).on('submit', '#hutangChatForm', function(e) {
+        e.preventDefault();
+        const input = $('#hutangChatInput');
+        const messageText = input.val().trim();
+        if (!messageText || !currentHutangReportContext) {
+            if (!currentHutangReportContext) {
+                Swal.fire('Analisis Diperlukan', 'Harap jalankan analisis awal terlebih dahulu sebelum memulai diskusi.', 'warning');
+            }
+            return;
+        }
+
+        if (hutangChatHistoryData.length === 0) {
+            $('#hutangChatHistory').empty();
+        }
+
+        const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        $('#hutangChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-primary border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-primary"><i class="fas fa-user me-1"></i>Anda</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light">' + messageText + '</div>' +
+            '</div>'
+        );
+        $('#hutangChatHistory').scrollTop($('#hutangChatHistory')[0].scrollHeight);
+
+        input.val('');
+        $('#hutangChatInput, #btnSendHutangChat').prop('disabled', true);
+
+        var replyId = 'hutang_reply_' + Date.now();
+        $('#hutangChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-info border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-info"><i class="fas fa-robot me-1"></i>AI CFO Assistant</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light" id="' + replyId + '"><i class="fas fa-spinner fa-spin text-info me-1"></i> Mengetik...</div>' +
+            '</div>'
+        );
+        $('#hutangChatHistory').scrollTop($('#hutangChatHistory')[0].scrollHeight);
+
+        let sampleData = [];
+        if (tableHutang && tableHutang.data().any()) {
+            let dtData = tableHutang.data().toArray();
+            dtData.sort((a,b) => b.sisa_hutang_val - a.sisa_hutang_val);
+            sampleData = dtData;
+        }
+
+        var chatData = new URLSearchParams();
+        chatData.append('action', 'chat_discuss');
+        chatData.append('message', messageText);
+        chatData.append('report_context', currentHutangReportContext);
+        chatData.append('raw_data', JSON.stringify(sampleData));
+        chatData.append('custom_prompt', $('#aiHutangPrompt').val().trim());
+        chatData.append('history', JSON.stringify(hutangChatHistoryData));
+        chatData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: chatData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullReply = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiHutangReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> ' + data.message + '</span>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullReply += data.choices[0].delta.content;
+                                if (typeof parseMarkdownBody === 'function') {
+                                    $('#' + replyId).html(parseMarkdownBody(fullReply));
+                                } else {
+                                    $('#' + replyId).text(fullReply);
+                                }
+                                $('#hutangChatHistory').scrollTop($('#hutangChatHistory')[0].scrollHeight);
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }
+
+            $('#hutangChatInput, #btnSendHutangChat').prop('disabled', false);
+
+            if (!isError && fullReply) {
+                hutangChatHistoryData.push({ role: 'user', content: messageText });
+                hutangChatHistoryData.push({ role: 'assistant', content: fullReply });
+            }
+        }).catch(err => {
+            $('#hutangChatInput, #btnSendHutangChat').prop('disabled', false);
+            $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error koneksi</span>');
+        });
+    });
+    <?php endif; ?>
 </script>
 <?php $page_js = ob_get_clean(); ?>
 

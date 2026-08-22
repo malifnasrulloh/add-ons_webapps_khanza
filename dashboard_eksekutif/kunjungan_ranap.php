@@ -82,11 +82,16 @@ html.theme-glass-animated .skeleton-text {
                             <th width="10%">Tgl Masuk</th>
                             <th width="15%">No. Rawat / Pasien</th>
                             <th width="15%">DPJP / Dokter</th>
-                            <th width="15%">Kamar / Penjamin</th>
-                            <th width="10%" class="text-end bg-secondary">Plafon</th>
-                            <th width="10%" class="text-end bg-warning text-dark">Est. Biaya</th>
-                            <th width="10%" class="text-end">Selisih</th>
-                            <th width="5%" class="text-center">Status</th> <th width="5%" class="text-center">Aksi</th>
+                            <th width="12%">Kamar / Penjamin</th>
+                            <th width="15%">Diagnosa</th>
+                            <th width="4%" class="text-center">Lab</th>
+                            <th width="4%" class="text-center">Rad</th>
+                            <th width="6%" class="text-center">Berkas</th>
+                            <th width="8%" class="text-end bg-secondary">Plafon</th>
+                            <th width="8%" class="text-end bg-warning text-dark">Est. Biaya</th>
+                            <th width="8%" class="text-end">Selisih</th>
+                            <th width="5%" class="text-center">Status</th>
+                            <th width="10%" class="text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -233,7 +238,8 @@ html.theme-glass-animated .skeleton-text {
                 { 
                     "data": null,
                     "render": function(data) {
-                        return `<b>${data.no_rawat}</b><br>${data.pasien} <br><small class="text-muted">RM: ${data.rm}</small>`;
+                        let lama = data.lama_rawat ? `<span class="badge bg-info text-dark ms-1">${data.lama_rawat}</span>` : '';
+                        return `<b>${data.no_rawat}</b> ${lama}<br>${data.pasien} <br><small class="text-muted">RM: ${data.rm}</small>`;
                     }
                 },
                 { 
@@ -257,6 +263,43 @@ html.theme-glass-animated .skeleton-text {
                             badgeClass = ''; badgeStyle = 'background-color: #e83e8c; color: white;'; 
                         }
                         return `${data.kamar}<br><span class="badge ${badgeClass}" style="${badgeStyle} border: 1px solid #ddd;">${data.penjamin}</span>`;
+                    }
+                },
+                {
+                    "data": "diagnosa_awal",
+                    "orderable": false,
+                    "render": function(data, type, row) { 
+                        let h = '';
+                        if(data && data !== '-') h += `<b>Awal:</b> ${data}<br>`;
+                        if(row.diagnosa_akhir && row.diagnosa_akhir !== '-') h += `<span class="text-success"><b>Akhir:</b> ${row.diagnosa_akhir}</span>`;
+                        return h || '-'; 
+                    }
+                },
+                { 
+                    "data": null, "className": "text-center", "orderable": false,
+                    "render": function(data, type, row) {
+                        if (row.count_lab > 0) return `<button class="btn btn-outline-info btn-sm btn-counter btn-modal" data-type="lab" data-id="${row.no_rawat}"><i class="fas fa-flask"></i><span class="badge bg-danger badge-counter" style="font-size:0.6rem;">${row.count_lab}</span></button>`;
+                        return '<small class="text-muted">-</small>';
+                    }
+                },
+                { 
+                    "data": null, "className": "text-center", "orderable": false,
+                    "render": function(data, type, row) {
+                        if (row.count_rad > 0) return `<button class="btn btn-outline-warning btn-sm btn-counter btn-modal" data-type="rad" data-id="${row.no_rawat}"><i class="fas fa-x-ray"></i><span class="badge bg-danger badge-counter" style="font-size:0.6rem;">${row.count_rad}</span></button>`;
+                        return '<small class="text-muted">-</small>';
+                    }
+                },
+                { 
+                    "data": null, "className": "text-center", "orderable": false,
+                    "render": function(data, type, row) {
+                        let icons = '';
+                        if (row.klaim_resume > 0) icons += '<i class="fas fa-file-medical text-success" title="Resume Medis" style="margin:2px; font-size:1.1rem;"></i>';
+                        if (row.klaim_triase > 0) icons += '<i class="fas fa-truck-medical text-danger" title="Triase IGD" style="margin:2px; font-size:1.1rem;"></i>';
+                        if (row.klaim_asesmen > 0) icons += '<i class="fas fa-stethoscope text-primary" title="Asesmen IGD" style="margin:2px; font-size:1.1rem;"></i>';
+                        if (row.klaim_operasi > 0) icons += '<i class="fas fa-procedures text-warning" title="Laporan Operasi" style="margin:2px; font-size:1.1rem;"></i>';
+                        
+                        if (icons === '') return '<small class="text-muted">-</small>';
+                        return `<button class="btn btn-light btn-sm border shadow-sm" onclick="bukaBerkasKlaim('${row.no_rawat}')" title="Buka Berkas Klaim">${icons}</button>`;
                     }
                 },
                 { 
@@ -297,11 +340,10 @@ html.theme-glass-animated .skeleton-text {
                 { 
                     "data": null, "className": "text-center", 
                     "render": function(data, type, row) {
-                        return `<button class="btn btn-sm btn-primary shadow-sm" 
-                                onclick="showDetailBilling('${row.no_rawat}', '${row.pasien.replace(/'/g, "\\'")}')"
-                                title="Lihat Rincian Lengkap">
-                                <i class="fas fa-list-ul"></i>
-                                </button>`;
+                        return `<div class="btn-group btn-group-sm shadow-sm">
+                                <button class="btn btn-primary" onclick="showDetailBilling('${row.no_rawat}', '${row.pasien.replace(/'/g, "\\'")}')" title="Rincian Billing"><i class="fas fa-file-invoice-dollar"></i></button>
+                                <button class="btn btn-secondary btn-modal" data-type="riwayat" data-id="${row.no_rawat}" title="Riwayat Lengkap Pasien & AI Casemix"><i class="fas fa-stream"></i></button>
+                                </div>`;
                     }
                 }
             ],
@@ -432,6 +474,77 @@ html.theme-glass-animated .skeleton-text {
             }
         });
     }
+
 </script>
+
+<div class="modal fade" id="modalUniversal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white py-2">
+                <h6 class="modal-title fw-bold" id="modalTitle">Riwayat Pasien & AI Cost Auditor</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="modalContent"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#tableKunjungan tbody').on('click', '.btn-modal', function() {
+        var type = $(this).data('type');
+        var no_rawat = $(this).data('id');
+        var url = 'api/riwayat/view_' + type + '.php';
+        var title = '';
+
+        if(type === 'riwayat') title = 'Riwayat Lengkap Pasien & AI Casemix';
+        else if(type === 'lab') title = 'Hasil Laboratorium';
+        else if(type === 'rad') title = 'Hasil Radiologi';
+        
+        if (type === 'riwayat') {
+            $('#modalUniversal .modal-dialog').removeClass('modal-xl').addClass('modal-fullscreen');
+        } else {
+            $('#modalUniversal .modal-dialog').removeClass('modal-fullscreen').addClass('modal-xl');
+        }
+
+        $('#modalTitle').html(title);
+        $('#modalContent').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>');
+        $('#modalUniversal').modal('show');
+        
+        var ajaxData = { no_rawat: no_rawat };
+        if(type === 'riwayat') ajaxData.ai_mode = 'mpp';
+
+        $.ajax({
+            url: url, method: 'POST', data: ajaxData,
+            success: function(res) { $('#modalContent').html(res); },
+            error: function() { $('#modalContent').html('<div class="p-3 text-danger">Gagal memuat data</div>'); }
+        });
+    });
+});
+
+function bukaBerkasKlaim(no_rawat) {
+    $('#isiModalBerkas').html('<div class="text-center p-5"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Memuat berkas...</div>');
+    $('#modalBerkas').modal('show');
+    
+    fetch('api/riwayat/modal_klaim_viewer.php?no_rawat=' + encodeURIComponent(no_rawat))
+        .then(res => res.text())
+        .then(html => { $('#isiModalBerkas').html(html); })
+        .catch(err => { $('#isiModalBerkas').html('<div class="alert alert-danger">Gagal memuat berkas: ' + err + '</div>'); });
+}
+</script>
+
+<div class="modal fade" id="modalBerkas" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white py-2">
+                <h6 class="modal-title fw-bold">Berkas Klaim BPJS (ERM Inti)</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="isiModalBerkas" style="background:#f0f0f0; padding:20px; max-height:85vh; overflow-y:auto;">
+                <div class="text-center"><i>Memuat...</i></div>
+            </div>
+        </div>
+    </div>
+</div>
 <?php $page_js = ob_get_clean(); ?>
 <?php require_once('includes/footer.php'); ?>

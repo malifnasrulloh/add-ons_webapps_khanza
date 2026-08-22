@@ -66,7 +66,7 @@ while($row = $res_ralan->fetch_assoc()) {
     $kd = $row['kd_dokter'];
     if(!isset($master_data[$kd])) {
         $master_data[$kd] = [
-            'nama' => $row['nm_dokter'],
+            'nm_dokter' => $row['nm_dokter'],
             'ralan' => 0,
             'ranap' => 0,
             'billing' => 0,
@@ -122,7 +122,7 @@ while($row = $res_ranap->fetch_assoc()) {
     // Jika dokter belum ada (misal: Dokter Spesialis yang jarang praktek poli tapi merawat inap)
     if(!isset($master_data[$kd])) {
         $master_data[$kd] = [
-            'nama' => $row['nm_dokter'],
+            'nm_dokter' => $row['nm_dokter'],
             'ralan' => 0,
             'ranap' => 0,
             'billing' => 0,
@@ -143,7 +143,7 @@ $chart_ralan = [];
 $chart_ranap = [];
 
 foreach($master_data as $kd => $data) {
-    $data['kode'] = $kd; // Tambahkan ini agar bisa dibaca JS
+    $data['kd_dokter'] = $kd; // Tambahkan ini agar bisa dibaca JS
     $data['total'] = $data['ralan'] + $data['ranap'];
     $final_data[] = $data;
 }
@@ -156,7 +156,7 @@ usort($final_data, function($a, $b) {
 // Ambil Top 15 untuk Chart agar tidak penuh sesak
 $top_15 = array_slice($final_data, 0, 15);
 foreach($top_15 as $row) {
-    $chart_labels[] = $row['nama'];
+    $chart_labels[] = $row['nm_dokter'];
     $chart_ralan[] = $row['ralan'];
     $chart_ranap[] = $row['ranap'];
 }

@@ -206,14 +206,35 @@ try {
     $stmt_tren = $koneksi_pdo->prepare($sql_tren);
     $stmt_tren->execute([':year' => $year]);
     
-    $d_ralan = array_fill(1, 12, 0);
-    $d_ranap = array_fill(1, 12, 0);
-    $d_total = array_fill(1, 12, 0);
+    $current_month = (int)date('m');
+    $d_ralan = [];
+    $d_ranap = [];
+    $d_total = [];
+    for ($m = 1; $m <= 12; $m++) {
+        if ($m <= $current_month) {
+            $d_ralan[$m] = 0;
+            $d_ranap[$m] = 0;
+            $d_total[$m] = 0;
+        } else {
+            $d_ralan[$m] = null;
+            $d_ranap[$m] = null;
+            $d_total[$m] = null;
+        }
+    }
     
     while($row = $stmt_tren->fetch(PDO::FETCH_ASSOC)) {
         $b = (int)$row['bulan']; $j = (int)$row['jumlah'];
-        if ($row['status_lanjut'] == 'Ralan') $d_ralan[$b] = $j; else $d_ranap[$b] = $j;
-        $d_total[$b] += $j;
+        if ($b >= 1 && $b <= 12) {
+            if ($row['status_lanjut'] == 'Ralan') {
+                $d_ralan[$b] = $j;
+            } else {
+                $d_ranap[$b] = $j;
+            }
+            if ($d_total[$b] === null) {
+                $d_total[$b] = 0;
+            }
+            $d_total[$b] += $j;
+        }
     }
     
     $response['tren'] = ['ralan' => array_values($d_ralan), 'ranap' => array_values($d_ranap), 'total' => array_values($d_total)];

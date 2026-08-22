@@ -1,0 +1,17 @@
+# ─── File sensitif & rahasia — JANGAN PERNAH di-commit ───────────────────────
+config/.license_active
+config/llm_config.json
+config/*.key
+config/*.secret
+config/*.token
+*.env
+.env.*
+
+# ─── Log & debug files ────────────────────────────────────────────────────────
+*.log
+/logs/
+
+# ─── OS artifacts ─────────────────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+desktop.ini

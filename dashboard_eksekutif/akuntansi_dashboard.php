@@ -5,6 +5,7 @@
  */
 $page_title = "Accounting Executive Summary";
 require_once('includes/header.php');
+require_once('includes/functions.php');
 ?>
 <style>
     .exec-header {
@@ -205,6 +206,71 @@ require_once('includes/header.php');
             </div>
         </div>
     </div>
+
+    <?php if (is_ai_active()): ?>
+    <!-- AI FINANCIAL ADVISOR CONTAINER -->
+    <div class="card bg-dark border-secondary mt-4 shadow-sm">
+        <div class="card-header bg-gradient bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <span class="fw-bold"><i class="fas fa-brain me-2"></i>Analisis Kesehatan Finansial AI (CFO Advisor)</span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFinancePrompt">
+                    <i class="fas fa-sliders-h me-1"></i> Tune Prompt
+                </button>
+                <button id="btnAnalyzeFinance" class="btn btn-sm btn-success fw-bold">
+                    <i class="fas fa-magic me-1"></i> Jalankan Analisis AI
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Collapsible Prompt Tuning Area -->
+            <div class="collapse mb-3" id="collapseFinancePrompt">
+                <div class="p-3 rounded border border-secondary bg-black bg-opacity-50">
+                    <label class="form-label text-warning small fw-bold">System Prompt (Instruksi Analisis Finansial):</label>
+                    <textarea id="aiFinancePrompt" class="form-control form-control-sm bg-dark text-light border-secondary" rows="4">Anda adalah Chief Financial Officer (CFO) & Penasihat Keuangan Rumah Sakit yang ahli. Analisis data finansial berikut (KPI, rincian pendapatan/beban, dan tren 12 bulan terakhir) dan susun Laporan Naratif Eksekutif dalam Bahasa Indonesia yang berfokus pada:
+1. Ringkasan Kinerja Keuangan (Laba/Rugi, Margin, Posisi Kas).
+2. Analisis Struktur Pendapatan dan Pengeluaran Terbesar (identifikasi penyumbang biaya/beban tertinggi).
+3. Evaluasi Tren Finansial 12 Bulan (apakah sehat, stabil, atau menurun).
+4. Rekomendasi Aksi Finansial Strategis bagi Direktur RS untuk mengoptimalkan profitabilitas dan mengefisienkan pengeluaran.</textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted">Setel prompt khusus ini untuk menyesuaikan gaya laporan finansial yang dihasilkan AI.</small>
+                        <button class="btn btn-xs btn-outline-warning text-warning" onclick="resetFinancePrompt()"><i class="fas fa-undo me-1"></i>Reset Prompt Default</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display Container Output -->
+            <div id="aiFinanceReportContainer" class="p-3 rounded border border-secondary bg-black bg-opacity-25 text-light" style="min-height: 120px; max-height: 500px; overflow-y: auto;">
+                <div class="text-muted small text-center py-4">
+                    <i class="fas fa-robot fa-2x mb-2 text-primary d-block"></i>
+                    Klik tombol <strong>"Jalankan Analisis AI"</strong> di atas untuk memproses ringkasan kesehatan finansial rumah sakit secara otomatis.
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
+                <small class="text-muted"><i class="fas fa-info-circle me-1"></i> Data finansial dianalisis berdasarkan periode filter terpilih.</small>
+                <button class="btn btn-sm btn-outline-info" onclick="exportToWord('aiFinanceReportContainer', 'Laporan_Analisis_Finansial_AI.doc')">
+                    <i class="fas fa-file-word me-1"></i> Ekspor Laporan ke Word (.doc)
+                </button>
+            </div>
+
+            <!-- AI Interactive Chat Assistant -->
+            <div class="mt-4 pt-3 border-top border-secondary">
+                <h6 class="fw-bold text-info mb-2"><i class="fas fa-comments me-2"></i>Tanya Jawab & Diskusi Keuangan dengan AI Assistant</h6>
+                <div id="financeChatHistory" class="p-3 rounded border border-secondary bg-black bg-opacity-50 mb-2" style="max-height: 300px; overflow-y: auto; min-height: 100px;">
+                    <div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan keuangan di atas...</div>
+                </div>
+                <form id="financeChatForm">
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="financeChatInput" class="form-control bg-dark text-light border-secondary" placeholder="Tanyakan detail finansial (misal: Mengapa beban biaya bulan lalu naik?)..." required>
+                        <button class="btn btn-primary" type="submit" id="btnSendFinanceChat">
+                            <i class="fas fa-paper-plane me-1"></i> Kirim
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <!-- BREAKDOWN MODAL -->
@@ -645,6 +711,267 @@ function exportDetailCSV(){
 (function(){var s=document.createElement('style');
     s.textContent='#detail-modal .modal-content{max-height:90vh;overflow-y:auto}.djh-card{background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:.85rem}.dj-lbl{font-size:.7rem;text-transform:uppercase;opacity:.6;letter-spacing:.05em}.dj-val{font-weight:600;color:#e2e8f0}.badge-bal{background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.4);color:#4ade80;border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:700}.badge-unbal{background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.4);color:#f87171;border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:700}.tbl-det thead th{background:rgba(56,189,248,.15)!important;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}.bubes-entry:hover td{background:rgba(255,193,7,.06)!important;cursor:pointer}';
     document.head.appendChild(s);})();
+
+// --- AI FINANCIAL ADVISOR JS PIPELINE ---
+var currentFinanceReportContext = "";
+var financeChatHistoryData = [];
+const defaultFinancePromptText = "Anda adalah Chief Financial Officer (CFO) & Penasihat Keuangan Rumah Sakit yang ahli. Analisis data finansial berikut (KPI, rincian pendapatan/beban, dan tren 12 bulan terakhir) dan susun Laporan Naratif Eksekutif dalam Bahasa Indonesia yang berfokus pada:\n1. Ringkasan Kinerja Keuangan (Laba/Rugi, Margin, Posisi Kas).\n2. Analisis Struktur Pendapatan dan Pengeluaran Terbesar (identifikasi penyumbang biaya/beban tertinggi).\n3. Evaluasi Tren Finansial 12 Bulan (apakah sehat, stabil, atau menurun).\n4. Rekomendasi Aksi Finansial Strategis bagi Direktur RS untuk mengoptimalkan profitabilitas dan mengefisienkan pengeluaran.";
+
+function resetFinancePrompt() {
+    $('#aiFinancePrompt').val(defaultFinancePromptText);
+}
+
+function parseMarkdownToHtml(md) {
+    if (!md) return '';
+    return md
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/^### (.*?)$/gm, '<h5 class="fw-bold text-info mt-3">$1</h5>')
+        .replace(/^## (.*?)$/gm, '<h4 class="fw-bold text-primary mt-4 border-bottom border-secondary pb-1">$1</h4>')
+        .replace(/^# (.*?)$/gm, '<h3 class="fw-bold text-primary mt-4">$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/^\s*[-*+]\s+(.*?)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*?<\/li>)/gs, '<ul class="mb-2">$1</ul>')
+        .replace(/<\/ul>\s*<ul class="mb-2">/g, '')
+        .replace(/^\s*([^#<>\s\-*+].*?)$/gm, '<p class="mb-2">$1</p>')
+        .replace(/\n\n/g, '<br>');
+}
+
+function exportToWord(elementId, fileName) {
+    var content = document.getElementById(elementId).innerHTML;
+    var header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>" +
+                 "<head><meta charset='utf-8'><title>Laporan Ekspor</title>" +
+                 "<style>body { font-family: Arial, sans-serif; line-height: 1.6; } h1, h2, h3 { color: #0284c7; }</style></head><body>";
+    var footer = "</body></html>";
+    
+    var blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || 'Laporan.doc';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+$(document).on('click', '#btnAnalyzeFinance', function() {
+    if (!_dashboardData) {
+        alert('Silakan tunggu data dashboard dimuat terlebih dahulu.');
+        return;
+    }
+
+    var btn = $(this);
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menganalisis...');
+    $('#aiFinanceReportContainer').html('<div class="text-center py-4"><div class="spinner-border text-info mb-2"></div><div class="small text-muted">AI sedang menganalisis kesehatan finansial...</div></div>');
+
+    var financialRawData = {
+        periode: $('#inp-tgl1').val() + ' s.d ' + $('#inp-tgl2').val(),
+        kpi: _dashboardData.kpi || {},
+        breakdown_revenue: (_dashboardData.breakdown && _dashboardData.breakdown.revenue ? _dashboardData.breakdown.revenue : []).map(function(r) { return { kd_rek: r.kd_rek, nama: r.nm_rek, jumlah: r.subtotal }; }),
+        breakdown_expenses: (_dashboardData.breakdown && _dashboardData.breakdown.expenses ? _dashboardData.breakdown.expenses : []).map(function(e) { return { kd_rek: e.kd_rek, nama: e.nm_rek, jumlah: e.subtotal }; }),
+        trend_12_bulan: (_dashboardData.chart && _dashboardData.chart.labels ? _dashboardData.chart.labels : []).map(function(label, idx) {
+            return { bulan: label, revenue: _dashboardData.chart.revenue[idx], expense: _dashboardData.chart.expense[idx] };
+        })
+    };
+
+    var formData = new URLSearchParams();
+    formData.append('action', 'batch_summary');
+    formData.append('raw_data', JSON.stringify([financialRawData]));
+    formData.append('custom_prompt', $('#aiFinancePrompt').val().trim());
+    formData.append('stream', '1');
+
+    fetch('api/ai_analyzer.php', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    }).then(async response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let fullText = "";
+        let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiFinanceReportContainer');
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, {stream: true});
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                line = line.trim();
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.substring(6);
+                    if (dataStr === '[DONE]') continue;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.message) {
+                            isError = true;
+                            $('#aiFinanceReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ' + data.message + '</div>');
+                        }
+                        if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                            fullText += data.choices[0].delta.content;
+                            $('#aiFinanceReportContainer').html(parseMarkdownToHtml(fullText));
+                        }
+                    } catch(e) {}
+                } else if (line.startsWith('event: error')) {
+                    isError = true;
+                }
+            }
+        }
+
+        btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+
+        if (!isError && fullText) {
+            currentFinanceReportContext = fullText;
+            financeChatHistoryData = [];
+            $('#financeChatHistory').html('<div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan keuangan di atas...</div>');
+        }
+    }).catch(err => {
+        btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+        $('#aiFinanceReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: Gagal menghubungi server (' + err.message + ')</div>');
+    });
+});
+
+$(document).on('submit', '#financeChatForm', function(e) {
+    e.preventDefault();
+    const input = $('#financeChatInput');
+    const messageText = input.val().trim();
+    if (!messageText || !currentFinanceReportContext) return;
+
+    if (financeChatHistoryData.length === 0) {
+        $('#financeChatHistory').empty();
+    }
+
+    const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    $('#financeChatHistory').append(
+        '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-primary border-3">' +
+            '<div class="d-flex justify-content-between mb-1">' +
+                '<span class="fw-bold small text-primary"><i class="fas fa-user me-1"></i>Anda</span>' +
+                '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+            '</div>' +
+            '<div class="small text-light">' + parseMarkdownToHtml(messageText) + '</div>' +
+        '</div>'
+    );
+    $('#financeChatHistory').scrollTop($('#financeChatHistory')[0].scrollHeight);
+
+    input.val('');
+    $('#financeChatInput, #btnSendFinanceChat').prop('disabled', true);
+
+    var replyId = 'fin_reply_' + Date.now();
+    $('#financeChatHistory').append(
+        '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-info border-3">' +
+            '<div class="d-flex justify-content-between mb-1">' +
+                '<span class="fw-bold small text-info"><i class="fas fa-robot me-1"></i>AI CFO Assistant</span>' +
+                '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+            '</div>' +
+            '<div class="small text-light" id="' + replyId + '"><i class="fas fa-spinner fa-spin text-info me-1"></i> Mengetik...</div>' +
+        '</div>'
+    );
+    $('#financeChatHistory').scrollTop($('#financeChatHistory')[0].scrollHeight);
+
+    var financialRawData = {
+        kpi: _dashboardData ? _dashboardData.kpi : {},
+        breakdown_revenue: _dashboardData ? (_dashboardData.breakdown.revenue || []) : []
+    };
+
+    var chatData = new URLSearchParams();
+    chatData.append('action', 'chat_discuss');
+    chatData.append('message', messageText);
+    chatData.append('report_context', currentFinanceReportContext);
+    chatData.append('raw_data', JSON.stringify([financialRawData]));
+    chatData.append('custom_prompt', $('#aiFinancePrompt').val().trim());
+    chatData.append('history', JSON.stringify(financeChatHistoryData));
+    chatData.append('stream', '1');
+
+    fetch('api/ai_analyzer.php', {
+        method: 'POST',
+        body: chatData,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    }).then(async response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let fullReply = "";
+        let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiFinanceReportContainer');
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, {stream: true});
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                line = line.trim();
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.substring(6);
+                    if (dataStr === '[DONE]') continue;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.message) {
+                            isError = true;
+                            $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> ' + data.message + '</span>');
+                        }
+                        if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                            fullReply += data.choices[0].delta.content;
+                            $('#' + replyId).html(parseMarkdownToHtml(fullReply));
+                            $('#financeChatHistory').scrollTop($('#financeChatHistory')[0].scrollHeight);
+                        }
+                    } catch(e) {}
+                } else if (line.startsWith('event: error')) {
+                    isError = true;
+                }
+            }
+        }
+
+        $('#financeChatInput, #btnSendFinanceChat').prop('disabled', false);
+
+        if (!isError && fullReply) {
+            financeChatHistoryData.push({ role: 'user', content: messageText });
+            financeChatHistoryData.push({ role: 'assistant', content: fullReply });
+        }
+    }).catch(err => {
+        $('#financeChatInput, #btnSendFinanceChat').prop('disabled', false);
+        $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error koneksi</span>');
+    });
+});
 </script>
 <?php $page_js = ob_get_clean(); ?>
 <?php require_once('includes/footer.php'); ?>

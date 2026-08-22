@@ -132,5 +132,18 @@ function cariIsi($conn, $sql, $parameter) {
     }
 }
 
+/**
+ * Cek status global AI/LLM
+ */
+function is_ai_active() {
+    $config_file = dirname(__DIR__) . '/config/llm_config.json';
+    if (file_exists($config_file)) {
+        $config = json_decode(file_get_contents($config_file), true);
+        if (isset($config['ai_status']) && $config['ai_status'] === 'off') {
+            return false;
+        }
+    }
+    return true; // Default aktif jika belum diatur
+}
 
 ?>

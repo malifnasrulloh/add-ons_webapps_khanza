@@ -25,7 +25,28 @@ class ThemeEngineManager {
         $data = ob_get_clean();
         
         if ($this->pipeline_initialized) {
-            foreach ($this->config_tokens as $token) {
+            // Cek lisensi — jika valid, token donasi (Saweria/QRIS) tidak wajib ada
+            $_lf = dirname(__DIR__) . '/config/.license_active';
+            $_licensed = file_exists($_lf) && hash('sha256', trim(@file_get_contents($_lf))) === '58f75d8e127b99616f9a178b7626a8afea758ef2656eb91cb42f4309857d7624';
+            unset($_lf);
+
+            // Token inti copyright — selalu wajib ada
+            $core_tokens = [
+                'SWNoc2FuIExlb25oYXJ0',   // Ichsan Leonhart
+                'NjI4NTcyNjEyMzc3Nw==',   // WA
+                'QEljaHNhbkxlb25oYXJ0',   // @IchsanLeonhart TG
+            ];
+            // Token donasi — hanya wajib jika belum lisensi
+            $donation_tokens = [
+                'c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA==',
+                'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc=',
+            ];
+
+            $tokens_to_check = $_licensed
+                ? $core_tokens
+                : array_merge($core_tokens, $donation_tokens);
+
+            foreach ($tokens_to_check as $token) {
                 if (strpos($data, base64_decode($token)) === false) {
                     // Fail-silent handler for execution security
                     echo "";
@@ -43,6 +64,7 @@ ob_start();
 $theme_engine = new ThemeEngineManager();
 
 require_once(dirname(__DIR__) . '/config/koneksi.php');
+require_once(dirname(__DIR__) . '/includes/functions.php');
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -91,6 +113,8 @@ function get_arrow_class($pages, $current) {
     <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 
     <style>
         :root {
@@ -744,6 +768,11 @@ function get_arrow_class($pages, $current) {
           <i class="fas fa-book-reader me-2 text-info" style="width: 20px;"></i> Panduan Pengguna
         </a>
       </li>
+      <li class="nav-item">
+        <a class="nav-link <?php echo is_active('whats_new.php', $current_page); ?>" href="whats_new.php">
+          <i class="fas fa-bullhorn me-2 text-warning" style="width: 20px;"></i> What's New (AI & Fitur)
+        </a>
+      </li>
     </ul>
 
     <?php
@@ -856,14 +885,15 @@ function get_arrow_class($pages, $current) {
     ?>
 
 	<?php if(isset($_SESSION['role']) && $_SESSION['role'] == 'Super Admin') { ?>
-    <div class="sidebar-group-header <?php echo get_arrow_class(['laporan_audit_trail.php', 'manage_users.php', 'setting_sidebar.php'], $current_page); ?>" data-bs-toggle="collapse" data-bs-target="#menuSuperAdmin">
+    <div class="sidebar-group-header <?php echo get_arrow_class(['laporan_audit_trail.php', 'manage_users.php', 'setting_sidebar.php', 'setting_llm.php'], $current_page); ?>" data-bs-toggle="collapse" data-bs-target="#menuSuperAdmin">
         <span><i class="fas fa-user-shield me-1"></i> Super Admin</span> <i class="fas fa-chevron-down"></i>
     </div>
-    <div class="collapse <?php echo get_collapse_class(['laporan_audit_trail.php', 'manage_users.php', 'setting_sidebar.php'], $current_page); ?>" id="menuSuperAdmin">
+    <div class="collapse <?php echo get_collapse_class(['laporan_audit_trail.php', 'manage_users.php', 'setting_sidebar.php', 'setting_llm.php'], $current_page); ?>" id="menuSuperAdmin">
 		<ul class="nav flex-column nav-flex-column">
             <li class="nav-item"><a class="nav-link <?php echo is_active('laporan_audit_trail.php', $current_page); ?>" href="laporan_audit_trail.php"><i class="fas fa-shield-alt me-2" style="width: 20px;"></i> Audit Trail</a></li>
 			<li class="nav-item"><a class="nav-link <?php echo is_active('manage_users.php', $current_page); ?>" href="manage_users.php"><i class="fas fa-users-cog me-2" style="width: 20px;"></i> Manage Users</a></li>
             <li class="nav-item"><a class="nav-link <?php echo is_active('setting_sidebar.php', $current_page); ?>" href="setting_sidebar.php"><i class="fas fa-sliders-h me-2" style="width: 20px;"></i> Setting Sidebar</a></li>
+            <li class="nav-item"><a class="nav-link <?php echo is_active('setting_llm.php', $current_page); ?>" href="setting_llm.php"><i class="fas fa-robot me-2" style="width: 20px;"></i> Pengaturan LLM</a></li>
 		</ul>
 	</div>
 	<?php } ?>

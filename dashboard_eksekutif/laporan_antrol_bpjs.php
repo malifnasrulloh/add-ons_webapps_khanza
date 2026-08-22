@@ -28,6 +28,7 @@ $metrics = [
 
 $tableRows = "";
 $tableRowsRaw = "";
+$all_antrol_rows = [];
 
 function renderRawCell($erm, $bpjs) {
     // Cleaning ERM Time
@@ -154,6 +155,31 @@ if ($stmt = $koneksi->prepare($sql)) {
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
             $t3 = (strpos($row['log TID_3'], ':') !== false);
+            
+            // Calculate Task 3 -> Task 4 delay
+            $t3_t4_badge = "";
+            $tr_style = "";
+            
+            $t3_valid = (strpos($row['log TID_3'], ':') !== false);
+            $t4_valid = (strpos($row['log TID_4'], ':') !== false);
+            
+            if ($t3_valid && $t4_valid) {
+                $time3 = strtotime("1970-01-01 " . $row['log TID_3']);
+                $time4 = strtotime("1970-01-01 " . $row['log TID_4']);
+                if ($time3 && $time4) {
+                    $diff_seconds = $time4 - $time3;
+                    if ($diff_seconds < 0) {
+                        $diff_seconds += 86400; // handle crossing midnight
+                    }
+                    $diff_minutes = round($diff_seconds / 60);
+                    if ($diff_minutes > 60) {
+                        $tr_style = "style='background-color: rgba(220, 53, 69, 0.08);'";
+                        $t3_t4_badge = "<br><span class='badge bg-danger mt-1 text-white shadow-sm' style='font-size:0.65rem;' title='Selisih Task 3 ke Task 4 melebihi 60 menit'><i class='fas fa-exclamation-triangle me-1'></i>Delay T3->T4: {$diff_minutes}m</span>";
+                    } else {
+                        $t3_t4_badge = "<br><span class='badge bg-light text-dark mt-1 shadow-sm' style='font-size:0.65rem;' title='Selisih Task 3 ke Task 4'><i class='fas fa-clock me-1'></i>T3->T4: {$diff_minutes}m</span>";
+                    }
+                }
+            }
 
             $is_batal_rs = ($row['Cancel'] === 'Batal');
             $is_anomaly_batal = false;
@@ -245,10 +271,10 @@ if ($stmt = $koneksi->prepare($sql)) {
                 $mjkn_badge .= "<br><span class='badge bg-danger mt-1' style='font-size: 0.70rem;'><i class='fas fa-exclamation-triangle'></i> Anomali Batal</span>";
             }
 
-            $tableRows .= "<tr>
+            $tableRows .= "<tr {$tr_style}>
                 <td>{$row['tgl_registrasi']}</td>
                 <td><strong>{$row['no_rawat']}</strong> {$mjkn_badge}</td>
-                <td>{$row['nm_pasien']}<br><small class='text-muted'>{$row['nm_dokter']}</small></td>
+                <td>{$row['nm_pasien']}<br><small class='text-muted'>{$row['nm_dokter']}</small>{$t3_t4_badge}</td>
                 <td>
                     <span class='fw-bold'>{$row['Poliklinik']}</span><br>
                     <small class='text-muted'>{$row['poli_rs']}</small><br>
@@ -271,15 +297,34 @@ if ($stmt = $koneksi->prepare($sql)) {
             $c6 = renderRawCell($row['TID 6 validasi resep'], $row['log TID_6']);
             $c7 = renderRawCell($row['TID 7 penyerahan resep'], $row['log TID_7']);
 
-            $tableRowsRaw .= "<tr>
+            $tableRowsRaw .= "<tr {$tr_style}>
                 <td><strong>{$row['no_rawat']}</strong> {$mjkn_badge}</td>
-                <td>{$row['nm_pasien']}<br><small class='text-muted'>Jadwal: {$row['jadwal']} (Q:{$row['kuota']})</small></td>
+                <td>{$row['nm_pasien']}<br><small class='text-muted'>Jadwal: {$row['jadwal']} (Q:{$row['kuota']})</small>{$t3_t4_badge}</td>
                 <td>$c3</td>
                 <td>$c4</td>
                 <td>$c5</td>
                 <td>$c6</td>
                 <td>$c7</td>
             </tr>";
+
+            $all_antrol_rows[] = [
+                'no_rawat' => $row['no_rawat'],
+                'booking' => $row['nobooking'],
+                'sep' => $row['no_sep'],
+                'tanggal' => $row['tgl_registrasi'],
+                'pasien' => $row['nm_pasien'],
+                'dokter' => $row['nm_dokter'],
+                'poli_bpjs' => $row['Poliklinik'],
+                'poli_rs' => $row['poli_rs'],
+                'jadwal' => $row['jadwal'],
+                'kuota' => (int)$row['kuota'],
+                't3' => $row['log TID_3'],
+                't4' => $row['log TID_4'],
+                't5' => $row['log TID_5'],
+                't6' => $row['log TID_6'],
+                't7' => $row['log TID_7'],
+                'is_complete' => $is_complete ? 'Lengkap' : 'Bocor'
+            ];
         }
     }
 }
@@ -456,6 +501,66 @@ ksort($trend_stats);
         </div>
     </div>
 </div>
+<?php if (is_ai_active()): ?>
+<!-- AI ANTROL BPJS ANALYZER CONTAINER -->
+<div class="card bg-dark border-secondary mt-4 shadow-sm mb-4">
+    <div class="card-header bg-gradient bg-success text-white d-flex justify-content-between align-items-center py-2">
+        <span class="fw-bold"><i class="fas fa-brain me-2"></i>Audit Waktu Tunggu & Kepatuhan Antrean Online BPJS (AI BPJS Queue Compliance Advisor)</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAntrolPrompt">
+                <i class="fas fa-sliders-h me-1"></i> Tune Prompt
+            </button>
+            <button id="btnAnalyzeAntrol" class="btn btn-sm btn-success fw-bold">
+                <i class="fas fa-magic me-1"></i> Jalankan Analisis AI
+            </button>
+        </div>
+    </div>
+    <div class="card-body text-light">
+        <!-- Collapsible Prompt Tuning Area -->
+        <div class="collapse mb-3" id="collapseAntrolPrompt">
+            <div class="p-3 rounded border border-secondary bg-black bg-opacity-50">
+                <label class="form-label text-warning small fw-bold">System Prompt (Instruksi Analisis Kepatuhan Antrean BPJS):</label>
+                <textarea id="aiAntrolPrompt" class="form-control form-control-sm bg-dark text-light border-secondary" rows="4">Anda adalah AI BPJS Queue Compliance Advisor yang ahli dalam operasional rumah sakit dan integrasi sistem antrean BPJS. Analisis data pencapaian target waktu tunggu antrean (Task 3 Admisi, Task 4 Layan Dok, Task 5 Usai Poli, Task 6 Apotek Val, Task 7 Penyerahan Obat) berikut. Deteksi poliklinik, dokter, atau hari dengan kinerja antrean terburuk, serta berikan rekomendasi perbaikan alur antrean agar rumah sakit terhindar dari sanksi disinsentif BPJS dan meningkatkan kepuasan pasien.</textarea>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small class="text-muted">Setel prompt khusus ini untuk menyesuaikan gaya laporan antrean BPJS yang dihasilkan AI.</small>
+                    <button class="btn btn-xs btn-outline-warning text-warning" onclick="resetAntrolPrompt()"><i class="fas fa-undo me-1"></i>Reset Prompt Default</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Display Container Output -->
+        <div id="aiAntrolReportContainer" class="p-3 rounded border border-secondary bg-black bg-opacity-25 text-light" style="min-height: 120px; max-height: 500px; overflow-y: auto;">
+            <div class="text-muted small text-center py-4">
+                <i class="fas fa-robot fa-2x mb-2 text-success d-block"></i>
+                Klik tombol <strong>"Jalankan Analisis AI"</strong> di atas untuk memproses ringkasan analisis antrean secara otomatis.
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
+            <small class="text-muted"><i class="fas fa-info-circle me-1"></i> Antrean BPJS dianalisis berdasarkan parameter tanggal cutoff terpilih.</small>
+            <button class="btn btn-sm btn-outline-info" onclick="exportToWord('aiAntrolReportContainer', 'Laporan_Analisis_Antrean_BPJS_AI.doc')">
+                <i class="fas fa-file-word me-1"></i> Ekspor Laporan ke Word (.doc)
+                </button>
+        </div>
+
+        <!-- AI Interactive Chat Assistant -->
+        <div class="mt-4 pt-3 border-top border-secondary">
+            <h6 class="fw-bold text-info mb-2"><i class="fas fa-comments me-2"></i>Tanya Jawab & Diskusi Kepatuhan Antrean BPJS dengan AI Assistant</h6>
+            <div id="antrolChatHistory" class="p-3 rounded border border-secondary bg-black bg-opacity-50 mb-2" style="max-height: 300px; overflow-y: auto; min-height: 100px;">
+                <div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>
+            </div>
+            <form id="antrolChatForm">
+                <div class="input-group input-group-sm">
+                    <input type="text" id="antrolChatInput" class="form-control bg-dark text-light border-secondary" placeholder="Tanyakan detail antrean (misal: Poli mana dengan persentase drop-off tertinggi?)..." required>
+                    <button class="btn btn-primary" type="submit" id="btnSendAntrolChat">
+                        <i class="fas fa-paper-plane me-1"></i> Kirim
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- TABS DATA -->
 <ul class="nav nav-tabs border-0 mt-5" id="antrolTabs" role="tablist">
@@ -613,6 +718,279 @@ function switchChart(type) {
     }
 }
 
+    // --- AI ANTROL BPJS ADVISOR JS PIPELINE ---
+    var _antrolResponseData = <?php echo json_encode($all_antrol_rows); ?>;
+    var currentAntrolReportContext = "";
+    var antrolChatHistoryData = [];
+    const defaultAntrolPromptText = "Anda adalah AI BPJS Queue Compliance Advisor yang ahli dalam operasional rumah sakit dan integrasi sistem antrean BPJS. Analisis data pencapaian target waktu tunggu antrean (Task 3 Admisi, Task 4 Layan Dok, Task 5 Usai Poli, Task 6 Apotek Val, Task 7 Penyerahan Obat) berikut. Deteksi poliklinik, dokter, atau hari dengan kinerja antrean terburuk, serta berikan rekomendasi perbaikan alur antrean agar rumah sakit terhindar dari sanksi disinsentif BPJS dan meningkatkan kepuasan pasien.";
+
+    function resetAntrolPrompt() {
+        $('#aiAntrolPrompt').val(defaultAntrolPromptText);
+    }
+
+    function parseMarkdownToHtml(md) {
+        if (!md) return '';
+        return md
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/^### (.*?)$/gm, '<h5 class="fw-bold text-info mt-3">$1</h5>')
+            .replace(/^## (.*?)$/gm, '<h4 class="fw-bold text-primary mt-4 border-bottom border-secondary pb-1">$1</h4>')
+            .replace(/^# (.*?)$/gm, '<h3 class="fw-bold text-primary mt-4">$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/^\s*[-*+]\s+(.*?)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*?<\/li>)/gs, '<ul class="mb-2">$1</ul>')
+            .replace(/<\/ul>\s*<ul class="mb-2">/g, '')
+            .replace(/^\s*([^#<>\s\-*+].*?)$/gm, '<p class="mb-2">$1</p>')
+            .replace(/\n\n/g, '<br>');
+    }
+
+    function exportToWord(elementId, fileName) {
+        var content = document.getElementById(elementId).innerHTML;
+        var header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>" +
+                     "<head><meta charset='utf-8'><title>Laporan Ekspor</title>" +
+                     "<style>body { font-family: Arial, sans-serif; line-height: 1.6; } h1, h2, h3 { color: #0284c7; }</style></head><body>";
+        var footer = "</body></html>";
+        
+        var blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'Laporan.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    $(document).on('click', '#btnAnalyzeAntrol', function() {
+        if (!_antrolResponseData || _antrolResponseData.length === 0) {
+            alert('Tidak ada data antrean untuk dianalisis.');
+            return;
+        }
+
+        var btn = $(this);
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menganalisis...');
+        $('#aiAntrolReportContainer').html('<div class="text-center py-4"><div class="spinner-border text-success mb-2"></div><div class="small text-muted">AI sedang menganalisis antrean BPJS...</div></div>');
+
+        // Slice to 30 records to prevent truncation while ensuring context remains rich
+        var sampleAntrol = _antrolResponseData;
+
+        var antrolRawData = {
+            periode: '<?php echo $tgl1; ?> sd <?php echo $tgl2; ?>',
+            summary: {
+                total_kunjungan: <?php echo $metrics['total_encounter']; ?>,
+                resep: <?php echo $metrics['total_resep']; ?>,
+                complete_journey: <?php echo $metrics['complete_journey']; ?>,
+                incomplete_journey: <?php echo $metrics['incomplete_journey']; ?>
+            },
+            sample_data: sampleAntrol
+        };
+
+        var formData = new URLSearchParams();
+        formData.append('action', 'batch_summary');
+        formData.append('raw_data', JSON.stringify([antrolRawData]));
+        formData.append('custom_prompt', $('#aiAntrolPrompt').val().trim());
+        formData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullText = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiAntrolReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#aiAntrolReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ' + data.message + '</div>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullText += data.choices[0].delta.content;
+                                $('#aiAntrolReportContainer').html(parseMarkdownToHtml(fullText));
+                            }
+                        } catch(e) {}
+                    } else if (line.startsWith('event: error')) {
+                        isError = true;
+                    }
+                }
+            }
+
+            btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+
+            if (!isError && fullText) {
+                currentAntrolReportContext = fullText;
+                antrolChatHistoryData = [];
+                $('#antrolChatHistory').html('<div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>');
+            }
+        }).catch(err => {
+            btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+            $('#aiAntrolReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: Gagal menghubungi server (' + err.message + ')</div>');
+        });
+    });
+
+    $(document).on('submit', '#antrolChatForm', function(e) {
+        e.preventDefault();
+        const input = $('#antrolChatInput');
+        const messageText = input.val().trim();
+        if (!messageText || !currentAntrolReportContext) return;
+
+        if (antrolChatHistoryData.length === 0) {
+            $('#antrolChatHistory').empty();
+        }
+
+        const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        $('#antrolChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-success border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-success"><i class="fas fa-user me-1"></i>Anda</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light">' + parseMarkdownToHtml(messageText) + '</div>' +
+            '</div>'
+        );
+        $('#antrolChatHistory').scrollTop($('#antrolChatHistory')[0].scrollHeight);
+
+        input.val('');
+        $('#antrolChatInput, #btnSendAntrolChat').prop('disabled', true);
+
+        var replyId = 'antrol_reply_' + Date.now();
+        $('#antrolChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-info border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-info"><i class="fas fa-robot me-1"></i>AI BPJS Assistant</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light" id="' + replyId + '"><i class="fas fa-spinner fa-spin text-info me-1"></i> Mengetik...</div>' +
+            '</div>'
+        );
+        $('#antrolChatHistory').scrollTop($('#antrolChatHistory')[0].scrollHeight);
+
+        var sampleAntrol = _antrolResponseData;
+        var antrolRawData = {
+            periode: '<?php echo $tgl1; ?> sd <?php echo $tgl2; ?>',
+            summary: {
+                total_kunjungan: <?php echo $metrics['total_encounter']; ?>,
+                resep: <?php echo $metrics['total_resep']; ?>,
+                complete_journey: <?php echo $metrics['complete_journey']; ?>,
+                incomplete_journey: <?php echo $metrics['incomplete_journey']; ?>
+            },
+            sample_data: sampleAntrol
+        };
+
+        var chatData = new URLSearchParams();
+        chatData.append('action', 'chat_discuss');
+        chatData.append('message', messageText);
+        chatData.append('report_context', currentAntrolReportContext);
+        chatData.append('raw_data', JSON.stringify([antrolRawData]));
+        chatData.append('custom_prompt', $('#aiAntrolPrompt').val().trim());
+        chatData.append('history', JSON.stringify(antrolChatHistoryData));
+        chatData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: chatData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullReply = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiAntrolReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> ' + data.message + '</span>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullReply += data.choices[0].delta.content;
+                                $('#' + replyId).html(parseMarkdownToHtml(fullReply));
+                                $('#antrolChatHistory').scrollTop($('#antrolChatHistory')[0].scrollHeight);
+                            }
+                        } catch(e) {}
+                    } else if (line.startsWith('event: error')) {
+                        isError = true;
+                    }
+                }
+            }
+
+            $('#antrolChatInput, #btnSendAntrolChat').prop('disabled', false);
+
+            if (!isError && fullReply) {
+                antrolChatHistoryData.push({ role: 'user', content: messageText });
+                antrolChatHistoryData.push({ role: 'assistant', content: fullReply });
+            }
+        }).catch(err => {
+            $('#antrolChatInput, #btnSendAntrolChat').prop('disabled', false);
+            $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error koneksi</span>');
+        });
+    });
+
 $(document).ready(function() {
     renderBarChart();
     
@@ -645,7 +1023,7 @@ $(document).ready(function() {
             }
         }
     });
-
+    
     const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
     new Chart(doughnutCtx, {
         type: 'doughnut',

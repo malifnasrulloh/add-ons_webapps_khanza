@@ -25,6 +25,7 @@ $metrics = [
 
 $trend = [];
 $tableRows = "";
+$all_satusehat_rows = [];
 
 // Heavy Left Join Query
 $sql = "SELECT 
@@ -170,6 +171,22 @@ if ($stmt = $koneksi->prepare($sql)) {
                 <td>{$row['nm_poli']}</td>
                 <td>{$status_html}</td>
             </tr>";
+
+            $all_satusehat_rows[] = [
+                'tgl_registrasi' => $row['tgl_registrasi'],
+                'no_rawat' => $row['no_rawat'],
+                'pasien' => $row['nm_pasien'],
+                'ktp_pasien' => $row['ktp_pasien'],
+                'dokter' => $row['nm_dokter'],
+                'ktp_dokter' => $row['ktp_dokter'],
+                'poliklinik' => $row['nm_poli'],
+                'encounter' => !empty($row['id_encounter']) ? 'Terkirim' : 'Pending',
+                'diagnosa' => $row['total_diagnosa'] > 0 ? ($row['diagnosa_sent'] > 0 ? 'Terkirim' : 'Pending') : 'Tidak Ada',
+                'ttv' => $row['total_ttv'] > 0 ? ($row['ttv_sent'] > 0 ? 'Terkirim' : 'Pending') : 'Tidak Ada',
+                'resep' => $row['total_resep'] > 0 ? ($row['resep_sent'] > 0 ? 'Terkirim' : 'Pending') : 'Tidak Ada',
+                'lab' => $row['total_lab'] > 0 ? ($row['lab_sent'] > 0 ? 'Terkirim' : 'Pending') : 'Tidak Ada',
+                'radiologi' => $row['total_rad'] > 0 ? ($row['rad_sent'] > 0 ? 'Terkirim' : 'Pending') : 'Tidak Ada'
+            ];
         }
     }
 }
@@ -309,6 +326,67 @@ foreach ($trendLabels as $dt) {
         </div>
     </div>
 </div>
+
+<?php if (is_ai_active()): ?>
+<!-- AI SATU SEHAT ANALYZER CONTAINER -->
+<div class="card bg-dark border-secondary mt-4 shadow-sm mb-4">
+    <div class="card-header bg-gradient bg-primary text-white d-flex justify-content-between align-items-center py-2">
+        <span class="fw-bold"><i class="fas fa-brain me-2"></i>Audit Kepatuhan & Sinkronisasi Satu Sehat AI (AI Satu Sehat Advisor)</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSSPrompt">
+                <i class="fas fa-sliders-h me-1"></i> Tune Prompt
+            </button>
+            <button id="btnAnalyzeSS" class="btn btn-sm btn-success fw-bold">
+                <i class="fas fa-magic me-1"></i> Jalankan Analisis AI
+            </button>
+        </div>
+    </div>
+    <div class="card-body text-light">
+        <!-- Collapsible Prompt Tuning Area -->
+        <div class="collapse mb-3" id="collapseSSPrompt">
+            <div class="p-3 rounded border border-secondary bg-black bg-opacity-50">
+                <label class="form-label text-warning small fw-bold">System Prompt (Instruksi Analisis Satu Sehat):</label>
+                <textarea id="aiSSPrompt" class="form-control form-control-sm bg-dark text-light border-secondary" rows="4">Anda adalah AI Satu Sehat Compliance Advisor yang ahli dalam integrasi rekam medis elektronik (RME) Kementerian Kesehatan. Analisis data pencapaian target kirim data Satu Sehat (Encounter, Diagnosa/Condition, TTV/Observation, Resep/MedicationRequest, Lab/ServiceRequest, Rad/ServiceRequest) berikut. Deteksi ketidaklengkapan NIK (pasien/dokter) serta persentase kegagalan pengiriman per modul, lalu berikan rekomendasi aksi taktis bagi divisi IT/Rekam Medis untuk menyelesaikan anomali ini.</textarea>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small class="text-muted">Setel prompt khusus ini untuk menyesuaikan gaya laporan Satu Sehat yang dihasilkan AI.</small>
+                    <button class="btn btn-xs btn-outline-warning text-warning" onclick="resetSSPrompt()"><i class="fas fa-undo me-1"></i>Reset Prompt Default</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Display Container Output -->
+        <div id="aiSSReportContainer" class="p-3 rounded border border-secondary bg-black bg-opacity-25 text-light" style="min-height: 120px; max-height: 500px; overflow-y: auto;">
+            <div class="text-muted small text-center py-4">
+                <i class="fas fa-robot fa-2x mb-2 text-primary d-block"></i>
+                Klik tombol <strong>"Jalankan Analisis AI"</strong> di atas untuk memproses ringkasan analisis Satu Sehat secara otomatis.
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary">
+            <small class="text-muted"><i class="fas fa-info-circle me-1"></i> Pengiriman Satu Sehat dianalisis berdasarkan cutoff tanggal terpilih.</small>
+            <button class="btn btn-sm btn-outline-info" onclick="exportToWord('aiSSReportContainer', 'Laporan_Analisis_Satu_Sehat_AI.doc')">
+                <i class="fas fa-file-word me-1"></i> Ekspor Laporan ke Word (.doc)
+            </button>
+        </div>
+
+        <!-- AI Interactive Chat Assistant -->
+        <div class="mt-4 pt-3 border-top border-secondary">
+            <h6 class="fw-bold text-info mb-2"><i class="fas fa-comments me-2"></i>Tanya Jawab & Diskusi Kepatuhan Satu Sehat dengan AI Assistant</h6>
+            <div id="ssChatHistory" class="p-3 rounded border border-secondary bg-black bg-opacity-50 mb-2" style="max-height: 300px; overflow-y: auto; min-height: 100px;">
+                <div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>
+            </div>
+            <form id="ssChatForm">
+                <div class="input-group input-group-sm">
+                    <input type="text" id="ssChatInput" class="form-control bg-dark text-light border-secondary" placeholder="Tanyakan detail kepatuhan Satu Sehat (misal: Mengapa persentase TTV rendah?)..." required>
+                    <button class="btn btn-primary" type="submit" id="btnSendSSChat">
+                        <i class="fas fa-paper-plane me-1"></i> Kirim
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- DATA TABLE ANOMALY -->
 <div class="table-container mb-5">
@@ -456,6 +534,283 @@ $(document).ready(function() {
         }
     });
 });
+
+    // --- AI SATU SEHAT ADVISOR JS PIPELINE ---
+    var _satusehatResponseData = <?php echo json_encode($all_satusehat_rows); ?>;
+    var currentSSReportContext = "";
+    var ssChatHistoryData = [];
+    const defaultSSPromptText = "Anda adalah AI Satu Sehat Compliance Advisor yang ahli dalam integrasi rekam medis elektronik (RME) Kementerian Kesehatan. Analisis data pencapaian target kirim data Satu Sehat (Encounter, Diagnosa/Condition, TTV/Observation, Resep/MedicationRequest, Lab/ServiceRequest, Rad/ServiceRequest) berikut. Deteksi ketidaklengkapan NIK (pasien/dokter) serta persentase kegagalan pengiriman per modul, lalu berikan rekomendasi aksi taktis bagi divisi IT/Rekam Medis untuk menyelesaikan anomali ini.";
+
+    function resetSSPrompt() {
+        $('#aiSSPrompt').val(defaultSSPromptText);
+    }
+
+    function parseMarkdownToHtml(md) {
+        if (!md) return '';
+        return md
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/^### (.*?)$/gm, '<h5 class="fw-bold text-info mt-3">$1</h5>')
+            .replace(/^## (.*?)$/gm, '<h4 class="fw-bold text-primary mt-4 border-bottom border-secondary pb-1">$1</h4>')
+            .replace(/^# (.*?)$/gm, '<h3 class="fw-bold text-primary mt-4">$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/^\s*[-*+]\s+(.*?)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*?<\/li>)/gs, '<ul class="mb-2">$1</ul>')
+            .replace(/<\/ul>\s*<ul class="mb-2">/g, '')
+            .replace(/^\s*([^#<>\s\-*+].*?)$/gm, '<p class="mb-2">$1</p>')
+            .replace(/\n\n/g, '<br>');
+    }
+
+    function exportToWord(elementId, fileName) {
+        var content = document.getElementById(elementId).innerHTML;
+        var header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>" +
+                     "<head><meta charset='utf-8'><title>Laporan Ekspor</title>" +
+                     "<style>body { font-family: Arial, sans-serif; line-height: 1.6; } h1, h2, h3 { color: #0284c7; }</style></head><body>";
+        var footer = "</body></html>";
+        
+        var blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'Laporan.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    $(document).on('click', '#btnAnalyzeSS', function() {
+        if (!_satusehatResponseData || _satusehatResponseData.length === 0) {
+            alert('Tidak ada data Satu Sehat untuk dianalisis.');
+            return;
+        }
+
+        var btn = $(this);
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menganalisis...');
+        $('#aiSSReportContainer').html('<div class="text-center py-4"><div class="spinner-border text-primary mb-2"></div><div class="small text-muted">AI sedang menganalisis kepatuhan Satu Sehat...</div></div>');
+
+        // Slice to 30 records to prevent truncation while ensuring context remains rich
+        var sampleSS = _satusehatResponseData;
+
+        var ssRawData = {
+            periode: '<?php echo $tgl1; ?> sd <?php echo $tgl2; ?>',
+            metrics: {
+                encounter: { target: <?php echo $metrics['encounter']['target']; ?>, sent: <?php echo $metrics['encounter']['sent']; ?>, pct: '<?php echo $pctEncounter; ?>%' },
+                diagnosa: { target: <?php echo $metrics['diagnosa']['target']; ?>, sent: <?php echo $metrics['diagnosa']['sent']; ?>, pct: '<?php echo $pctDiagnosa; ?>%' },
+                ttv: { target: <?php echo $metrics['ttv']['target']; ?>, sent: <?php echo $metrics['ttv']['sent']; ?>, pct: '<?php echo $pctTTV; ?>%' },
+                resep: { target: <?php echo $metrics['resep']['target']; ?>, sent: <?php echo $metrics['resep']['sent']; ?>, pct: '<?php echo $pctResep; ?>%' },
+                lab: { target: <?php echo $metrics['lab']['target']; ?>, sent: <?php echo $metrics['lab']['sent']; ?>, pct: '<?php echo $pctLab; ?>%' },
+                radiologi: { target: <?php echo $metrics['rad']['target']; ?>, sent: <?php echo $metrics['rad']['sent']; ?>, pct: '<?php echo $pctRad; ?>%' }
+            },
+            sample_data: sampleSS
+        };
+
+        var formData = new URLSearchParams();
+        formData.append('action', 'batch_summary');
+        formData.append('raw_data', JSON.stringify([ssRawData]));
+        formData.append('custom_prompt', $('#aiSSPrompt').val().trim());
+        formData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullText = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiSSReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#aiSSReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ' + data.message + '</div>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullText += data.choices[0].delta.content;
+                                $('#aiSSReportContainer').html(parseMarkdownToHtml(fullText));
+                            }
+                        } catch(e) {}
+                    } else if (line.startsWith('event: error')) {
+                        isError = true;
+                    }
+                }
+            }
+
+            btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+
+            if (!isError && fullText) {
+                currentSSReportContext = fullText;
+                ssChatHistoryData = [];
+                $('#ssChatHistory').html('<div class="text-muted small text-center italic py-2">Mulai diskusi dengan mengajukan pertanyaan di bawah terkait laporan di atas...</div>');
+            }
+        }).catch(err => {
+            btn.prop('disabled', false).html('<i class="fas fa-magic me-1"></i> Jalankan Analisis AI');
+            $('#aiSSReportContainer').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: Gagal menghubungi server (' + err.message + ')</div>');
+        });
+    });
+
+    $(document).on('submit', '#ssChatForm', function(e) {
+        e.preventDefault();
+        const input = $('#ssChatInput');
+        const messageText = input.val().trim();
+        if (!messageText || !currentSSReportContext) return;
+
+        if (ssChatHistoryData.length === 0) {
+            $('#ssChatHistory').empty();
+        }
+
+        const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        $('#ssChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-primary border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-primary"><i class="fas fa-user me-1"></i>Anda</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light">' + parseMarkdownToHtml(messageText) + '</div>' +
+            '</div>'
+        );
+        $('#ssChatHistory').scrollTop($('#ssChatHistory')[0].scrollHeight);
+
+        input.val('');
+        $('#ssChatInput, #btnSendSSChat').prop('disabled', true);
+
+        var replyId = 'ss_reply_' + Date.now();
+        $('#ssChatHistory').append(
+            '<div class="chat-msg mb-2 p-2 bg-dark rounded border-start border-info border-3">' +
+                '<div class="d-flex justify-content-between mb-1">' +
+                    '<span class="fw-bold small text-info"><i class="fas fa-robot me-1"></i>AI Satu Sehat Advisor</span>' +
+                    '<small class="text-muted" style="font-size:0.7rem">' + timeStr + '</small>' +
+                '</div>' +
+                '<div class="small text-light" id="' + replyId + '"><i class="fas fa-spinner fa-spin text-info me-1"></i> Mengetik...</div>' +
+            '</div>'
+        );
+        $('#ssChatHistory').scrollTop($('#ssChatHistory')[0].scrollHeight);
+
+        var sampleSS = _satusehatResponseData;
+        var ssRawData = {
+            periode: '<?php echo $tgl1; ?> sd <?php echo $tgl2; ?>',
+            metrics: {
+                encounter: { target: <?php echo $metrics['encounter']['target']; ?>, sent: <?php echo $metrics['encounter']['sent']; ?>, pct: '<?php echo $pctEncounter; ?>%' },
+                diagnosa: { target: <?php echo $metrics['diagnosa']['target']; ?>, sent: <?php echo $metrics['diagnosa']['sent']; ?>, pct: '<?php echo $pctDiagnosa; ?>%' },
+                ttv: { target: <?php echo $metrics['ttv']['target']; ?>, sent: <?php echo $metrics['ttv']['sent']; ?>, pct: '<?php echo $pctTTV; ?>%' },
+                resep: { target: <?php echo $metrics['resep']['target']; ?>, sent: <?php echo $metrics['resep']['sent']; ?>, pct: '<?php echo $pctResep; ?>%' },
+                lab: { target: <?php echo $metrics['lab']['target']; ?>, sent: <?php echo $metrics['lab']['sent']; ?>, pct: '<?php echo $pctLab; ?>%' },
+                radiologi: { target: <?php echo $metrics['rad']['target']; ?>, sent: <?php echo $metrics['rad']['sent']; ?>, pct: '<?php echo $pctRad; ?>%' }
+            },
+            sample_data: sampleSS
+        };
+
+        var chatData = new URLSearchParams();
+        chatData.append('action', 'chat_discuss');
+        chatData.append('message', messageText);
+        chatData.append('report_context', currentSSReportContext);
+        chatData.append('raw_data', JSON.stringify([ssRawData]));
+        chatData.append('custom_prompt', $('#aiSSPrompt').val().trim());
+        chatData.append('history', JSON.stringify(ssChatHistoryData));
+        chatData.append('stream', '1');
+
+        fetch('api/ai_analyzer.php', {
+            method: 'POST',
+            body: chatData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }).then(async response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullReply = "";
+            let isError = false;
+            let isThinking = false;
+            const aiThinkingContainer = document.getElementById('aiSSReportContainer');
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, {stream: true});
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (let line of lines) {
+                    if (line === 'event: thinking') {
+                        isThinking = true;
+                        continue;
+                    }
+                    if (isThinking && line.startsWith('data: ')) {
+                        isThinking = false;
+                        try {
+                            const td = JSON.parse(line.substring(6));
+                            if (typeof aiThinkingContainer !== 'undefined' && aiThinkingContainer) {
+                                aiThinkingContainer.innerHTML = buildThinkingHTML(td.row_count || 0, td.message || '');
+                            }
+                        } catch(e) {}
+                        continue;
+                    }
+
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr === '[DONE]') continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.message) {
+                                isError = true;
+                                $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> ' + data.message + '</span>');
+                            }
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullReply += data.choices[0].delta.content;
+                                $('#' + replyId).html(parseMarkdownToHtml(fullReply));
+                                $('#ssChatHistory').scrollTop($('#ssChatHistory')[0].scrollHeight);
+                            }
+                        } catch(e) {}
+                    } else if (line.startsWith('event: error')) {
+                        isError = true;
+                    }
+                }
+            }
+
+            $('#ssChatInput, #btnSendSSChat').prop('disabled', false);
+
+            if (!isError && fullReply) {
+                ssChatHistoryData.push({ role: 'user', content: messageText });
+                ssChatHistoryData.push({ role: 'assistant', content: fullReply });
+            }
+        }).catch(err => {
+            $('#ssChatInput, #btnSendSSChat').prop('disabled', false);
+            $('#' + replyId).html('<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error koneksi</span>');
+        });
+    });
 </script>
 
 <?php include 'includes/footer.php'; ?>

@@ -61,7 +61,8 @@ try {
 
     $sql_limit = ($length != -1) ? " LIMIT " . (int)$start . ", " . (int)$length : "";
 
-    $sql_data = "SELECT ki.no_rawat, ki.tgl_masuk, ki.jam_masuk, ki.stts_pulang,
+    $sql_data = "SELECT ki.no_rawat, ki.tgl_masuk, ki.jam_masuk, ki.tgl_keluar, ki.jam_keluar, ki.stts_pulang,
+                 ki.diagnosa_awal, ki.diagnosa_akhir,
                  p.nm_pasien, p.no_rkm_medis, b.nm_bangsal, k.kd_kamar,
                  pj.png_jawab, pj.kd_pj, rp.biaya_reg,
                  -- Fetch DPJP from dpjp_ranap, fallback to reg_periksa doctor
@@ -70,7 +71,13 @@ try {
                      d.nm_dokter
                  ) AS nm_dokter,
                  -- Flag to check if it is fallback (1 = fallback, 0 = has DPJP)
-                 CASE WHEN (SELECT COUNT(*) FROM dpjp_ranap dr WHERE dr.no_rawat = ki.no_rawat) > 0 THEN 0 ELSE 1 END AS is_dpjp_fallback
+                 CASE WHEN (SELECT COUNT(*) FROM dpjp_ranap dr WHERE dr.no_rawat = ki.no_rawat) > 0 THEN 0 ELSE 1 END AS is_dpjp_fallback,
+                 (SELECT COUNT(*) FROM periksa_lab WHERE no_rawat = ki.no_rawat) as total_lab,
+                 (SELECT COUNT(*) FROM periksa_radiologi WHERE no_rawat = ki.no_rawat) as total_rad,
+                 (SELECT COUNT(no_rawat) FROM resume_pasien_ranap WHERE no_rawat = ki.no_rawat) as ada_resume,
+                 (SELECT COUNT(no_rawat) FROM data_triase_igd WHERE no_rawat = ki.no_rawat) as ada_triase,
+                 (SELECT COUNT(no_rawat) FROM penilaian_medis_igd WHERE no_rawat = ki.no_rawat) as ada_asesmen,
+                 (SELECT COUNT(no_rawat) FROM operasi WHERE no_rawat = ki.no_rawat) as ada_operasi
                  FROM kamar_inap ki 
                  JOIN reg_periksa rp ON ki.no_rawat = rp.no_rawat
                  JOIN pasien p ON rp.no_rkm_medis = p.no_rkm_medis
@@ -90,6 +97,16 @@ try {
     // 5. FORMAT OUTPUT (TANPA KALKULASI — Lazy Loading v2)
     $data = [];
     foreach ($raw_data as $r) {
+        // Hitung Hari Rawat (UI Only)
+        $tgl_keluar = ($r['tgl_keluar'] != '0000-00-00') ? $r['tgl_keluar'] : date('Y-m-d');
+        $jam_keluar = ($r['jam_keluar'] == '00:00:00') ? date('H:i:s') : $r['jam_keluar'];
+        try {
+            $d1 = new DateTime($r['tgl_masuk'].' '.$r['jam_masuk']);
+            $d2 = new DateTime($tgl_keluar.' '.$jam_keluar);
+            $hari_ui = $d2->diff($d1)->days;
+            if($hari_ui < 1) $hari_ui = 0;
+        } catch(Exception $e) { $hari_ui = 0; }
+
         $data[] = [
             "waktu"          => $r['tgl_masuk'],
             "no_rawat"       => $r['no_rawat'],
@@ -100,6 +117,17 @@ try {
             "kamar"          => $r['nm_bangsal'],
             "penjamin"       => $r['png_jawab'],
             "kd_pj"          => $r['kd_pj'],
+            
+            "diagnosa_awal"  => $r['diagnosa_awal'],
+            "diagnosa_akhir" => $r['diagnosa_akhir'],
+            "lama_rawat"     => $hari_ui . " Hari",
+            "count_lab"      => $r['total_lab'],
+            "count_rad"      => $r['total_rad'],
+            "klaim_resume"   => $r['ada_resume'],
+            "klaim_triase"   => $r['ada_triase'],
+            "klaim_asesmen"  => $r['ada_asesmen'],
+            "klaim_operasi"  => $r['ada_operasi'],
+            
             // Placeholder — akan diisi async oleh frontend
             "estimasi"       => null,
             "plafon"         => null,
