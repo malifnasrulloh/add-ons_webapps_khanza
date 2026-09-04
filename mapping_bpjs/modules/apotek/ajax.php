@@ -14,21 +14,42 @@ $action = $_GET['action'] ?? '';
 
 try {
     if ($action === 'load_table') {
-        $draw   = intval($_GET['draw'] ?? 1);
-        $start  = intval($_GET['start'] ?? 0);
-        $length = intval($_GET['length'] ?? 10);
+        $draw    = intval($_GET['draw'] ?? 1);
+        $start   = intval($_GET['start'] ?? 0);
+        $length  = intval($_GET['length'] ?? 10);
         if ($length < 1 || $length > 100) $length = 10;
-        $search = isset($_GET['search']['value']) ? trim($_GET['search']['value']) : '';
 
-        $whereSql = "";
+        // Tangkap parameter pencarian: keyword dari tombol "Tampilkan" dan search bawaan DataTables
+        $keyword = trim($_GET['keyword'] ?? '');
+        $search  = isset($_GET['search']['value']) ? trim($_GET['search']['value']) : '';
+
+        // Hitung total baseline: hanya obat aktif (status = '1')
+        $stmtTotal    = $pdo->query("SELECT COUNT(*) FROM databarang WHERE status = '1'");
+        $recordsTotal = (int)$stmtTotal->fetchColumn();
+
+        // Base condition: wajib obat aktif
+        $whereConditions = ["db.status = '1'"];
         $params = [];
+
+        // Filter dari input pencarian server-side atas
+        if ($keyword !== '') {
+            $whereConditions[] = "(db.kode_brng LIKE :keyword
+                                   OR db.nama_brng LIKE :keyword
+                                   OR mb.kode_brng_apotek_bpjs LIKE :keyword
+                                   OR mb.nama_brng_apotek_bpjs LIKE :keyword)";
+            $params[':keyword'] = '%' . $keyword . '%';
+        }
+
+        // Filter dari search box bawaan DataTables
         if ($search !== '') {
-            $whereSql = " WHERE db.kode_brng LIKE :search
-                           OR db.nama_brng LIKE :search
-                           OR mb.kode_brng_apotek_bpjs LIKE :search
-                           OR mb.nama_brng_apotek_bpjs LIKE :search ";
+            $whereConditions[] = "(db.kode_brng LIKE :search
+                                   OR db.nama_brng LIKE :search
+                                   OR mb.kode_brng_apotek_bpjs LIKE :search
+                                   OR mb.nama_brng_apotek_bpjs LIKE :search)";
             $params[':search'] = '%' . $search . '%';
         }
+
+        $whereSql = " WHERE " . implode(' AND ', $whereConditions);
 
         // databarang has NO 'satuan' column; unit name lives in kodesatuan.satuan (via kode_sat)
         $countSql = "SELECT COUNT(DISTINCT db.kode_brng) AS total
@@ -37,7 +58,18 @@ try {
                      " . $whereSql;
         $stmtCount = $pdo->prepare($countSql);
         $stmtCount->execute($params);
-        $totalRecords = (int) $stmtCount->fetch()['total'];
+        $recordsFiltered = (int) $stmtCount->fetch()['total'];
+
+        // Sorting kolom dinamis
+        $orderColIndex = isset($_GET['order'][0]['column']) ? (int)$_GET['order'][0]['column'] : 1;
+        $orderDir      = isset($_GET['order'][0]['dir']) && strtolower($_GET['order'][0]['dir']) === 'desc' ? 'DESC' : 'ASC';
+        $colMap = [
+            0 => 'db.kode_brng',
+            1 => 'db.nama_brng',
+            2 => 'mb.kode_brng_apotek_bpjs',
+            3 => 'mb.kode_brng_apotek_bpjs'
+        ];
+        $orderBy = isset($colMap[$orderColIndex]) ? $colMap[$orderColIndex] : 'db.nama_brng';
 
         $dataSql = "SELECT
                         db.kode_brng,
@@ -50,7 +82,7 @@ try {
                     LEFT JOIN kodesatuan ks ON db.kode_sat = ks.kode_sat
                     $whereSql
                     GROUP BY db.kode_brng, db.nama_brng, ks.satuan
-                    ORDER BY db.nama_brng ASC
+                    ORDER BY $orderBy $orderDir
                     LIMIT :start, :length";
 
         $stmtData = $pdo->prepare($dataSql);
@@ -98,10 +130,10 @@ try {
         }
 
         echo json_encode([
-            "draw" => $draw,
-            "recordsTotal" => $totalRecords,
-            "recordsFiltered" => $totalRecords,
-            "data" => $data
+            "draw"            => $draw,
+            "recordsTotal"    => $recordsTotal,
+            "recordsFiltered" => $recordsFiltered,
+            "data"            => $data
         ]);
         exit;
     }
@@ -115,7 +147,7 @@ try {
         $stmt = $pdo->prepare(
             "SELECT kode_brng AS id, CONCAT(kode_brng, ' - ', nama_brng) AS text, nama_brng
              FROM databarang
-             WHERE kode_brng LIKE :q OR nama_brng LIKE :q
+             WHERE status = '1' AND (kode_brng LIKE :q OR nama_brng LIKE :q)
              ORDER BY nama_brng ASC LIMIT 20"
         );
         $stmt->execute([':q' => '%' . $q . '%']);

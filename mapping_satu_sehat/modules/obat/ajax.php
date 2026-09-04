@@ -23,8 +23,8 @@ try {
     if ($action === 'load_table') {
         $keyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
 
-        // Count total records (tanpa filter keyword)
-        $stmtTotal = $pdo->query("SELECT COUNT(*) FROM databarang");
+        // Count total records aktif (tanpa filter pencarian keyword)
+        $stmtTotal = $pdo->query("SELECT COUNT(*) FROM databarang WHERE status = '1'");
         $recordsTotal = (int)$stmtTotal->fetchColumn();
 
         // Base query
@@ -39,17 +39,19 @@ try {
 
         $params = [];
 
-        // Filter keyword dari tombol 'Tampilkan'
-        $where = [];
+        // Base condition: hanya obat aktif
+        $where = ["d.status = '1'"];
+
+        // Filter keyword dari tombol 'Tampilkan' (komprehensif: Kode RS, Nama RS, Kode KFA, Nama KFA)
         if (!empty($keyword)) {
-            $where[] = "(d.nama_brng LIKE :k OR d.kode_brng LIKE :k)";
+            $where[] = "(d.nama_brng LIKE :k OR d.kode_brng LIKE :k OR m.obat_code LIKE :k OR m.obat_display LIKE :k)";
             $params[':k'] = "%$keyword%";
         }
 
         // Filter dari search box bawaan DataTables
         $dt_search = isset($_GET['search']['value']) ? trim($_GET['search']['value']) : '';
         if (!empty($dt_search)) {
-            $where[] = "(d.nama_brng LIKE :s OR d.kode_brng LIKE :s OR m.obat_code LIKE :s)";
+            $where[] = "(d.nama_brng LIKE :s OR d.kode_brng LIKE :s OR m.obat_code LIKE :s OR m.obat_display LIKE :s)";
             $params[':s'] = "%$dt_search%";
         }
 
