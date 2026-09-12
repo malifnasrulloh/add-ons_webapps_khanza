@@ -106,6 +106,22 @@ if ($action === 'run_import') {
 
                 "CREATE TABLE IF NOT EXISTS `satu_sehat_mapping_vaksin` (
                     `kode_brng` varchar(15) NOT NULL, `vaksin_code` varchar(15) DEFAULT NULL, `vaksin_system` varchar(100) NOT NULL DEFAULT 'http://sys-ids.kemkes.go.id/kfa', `vaksin_display` varchar(80) DEFAULT NULL, `route_code` varchar(30) DEFAULT NULL, `route_system` varchar(100) DEFAULT NULL, `route_display` varchar(80) DEFAULT NULL, `dose_quantity_code` varchar(15) DEFAULT NULL, `dose_quantity_system` varchar(80) DEFAULT NULL, `dose_quantity_unit` varchar(15) DEFAULT NULL, PRIMARY KEY (`kode_brng`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=latin1",
+
+                "CREATE TABLE IF NOT EXISTS `satu_sehat_ref_alkes` (
+                    `kfa_code` varchar(30) NOT NULL,
+                    `display_name` varchar(500) NOT NULL,
+                    `nama_dagang` varchar(500) DEFAULT NULL,
+                    `nie` varchar(100) DEFAULT NULL,
+                    `manufacturer` varchar(255) DEFAULT NULL,
+                    `product_template_code` varchar(30) DEFAULT NULL,
+                    `product_template_name` varchar(255) DEFAULT NULL,
+                    `farmalkes_type` varchar(50) DEFAULT 'device',
+                    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`kfa_code`),
+                    KEY `idx_display_name` (`display_name`(191)),
+                    KEY `idx_nama_dagang` (`nama_dagang`(191)),
+                    KEY `idx_nie` (`nie`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=latin1"
             ];
             foreach ($tables as $t) {
@@ -128,7 +144,7 @@ if ($action === 'run_import') {
 // Cek status database saat ini
 $missing_mapping_tables = [];
 $check_mapping_tables = [
-    'satu_sehat_mapping_obat', 'satu_sehat_mapping_lab', 'satu_sehat_mapping_radiologi', 'satu_sehat_mapping_vaksin'
+    'satu_sehat_mapping_obat', 'satu_sehat_mapping_lab', 'satu_sehat_mapping_radiologi', 'satu_sehat_mapping_vaksin', 'satu_sehat_ref_alkes'
 ];
 
 $missing_ref_tables = [];

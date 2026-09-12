@@ -118,6 +118,27 @@ while($row = mysqli_fetch_assoc($q_master)){ $master_berkas[] = $row; }
         .generator-card { border-left: 4px solid #198754; height: 100%; }
         .list-card { border-left: 4px solid #0d6efd; height: 100%; }
         .modal-preview-content { min-height: 500px; width: 100%; border: none; }
+
+        /* Fix Select2 inside Modal: pastikan selalu di bawah input, z-index tinggi, dan scrollable */
+        .modal-body .mb-3, .modal-body .col-md-6 { position: relative; }
+        .select2-container { width: 100% !important; z-index: 1060; }
+        .input-group > .select2-container--bootstrap-5 {
+            flex: 1 1 auto !important;
+            width: 1% !important;
+        }
+        .select2-container--open { z-index: 1065 !important; }
+        .select2-container--open .select2-dropdown {
+            z-index: 1065 !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15) !important;
+            overflow: hidden !important;
+        }
+        .select2-container--open .select2-results__options {
+            max-height: 220px !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
     </style>
 </head>
 <body>
@@ -324,8 +345,51 @@ while($row = mysqli_fetch_assoc($q_master)){ $master_berkas[] = $row; }
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+    // Extension: Selalu posisikan dropdown Select2 tepat di bawah input
+    (function($) {
+        if (!$.fn.select2 || !$.fn.select2.amd) return;
+        try {
+            var AttachBody = $.fn.select2.amd.require('select2/dropdown/attachBody');
+            AttachBody.prototype._positionDropdown = function() {
+                var offset = this.$container.offset();
+                if (!offset) return;
+                var container = {
+                    height: this.$container.outerHeight(false),
+                    top: offset.top,
+                    bottom: offset.top + this.$container.outerHeight(false)
+                };
+
+                var $offsetParent = this.$dropdownParent;
+                if ($offsetParent.css('position') === 'static') {
+                    $offsetParent = $offsetParent.offsetParent();
+                }
+                var parentOffset = $offsetParent.offset() || { top: 0, left: 0 };
+
+                var css = {
+                    left: offset.left - parentOffset.left,
+                    top: container.bottom - parentOffset.top,
+                    width: this.$container.outerWidth(false)
+                };
+
+                this.$dropdown
+                    .removeClass('select2-dropdown--above')
+                    .addClass('select2-dropdown--below');
+                this.$container
+                    .removeClass('select2-container--above')
+                    .addClass('select2-container--below');
+
+                this.$dropdownContainer.css(css);
+            };
+        } catch (e) {}
+    })(jQuery);
+
     $(document).ready(function() {
-        $('.select2-berkas').select2({ theme: 'bootstrap-5', dropdownParent: $('#modalUpload') });
+        $('.select2-berkas').each(function() {
+            $(this).select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $(this).closest('.mb-3')
+            });
+        });
     });
 
     document.getElementById('checkAll').addEventListener('change', function() {

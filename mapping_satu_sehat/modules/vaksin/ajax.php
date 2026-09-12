@@ -223,6 +223,7 @@ try {
         $dose_qty_code   = trim($_POST['dose_quantity_code'] ?? '');
         $dose_qty_system = trim($_POST['dose_quantity_system'] ?? 'http://unitsofmeasure.org');
         $dose_qty_unit   = trim($_POST['dose_quantity_unit'] ?? '');
+        $sync_obat       = !empty($_POST['sync_obat']) && ($_POST['sync_obat'] == '1' || $_POST['sync_obat'] === true || $_POST['sync_obat'] === 'true');
 
         if (empty($kode_brng) || empty($vaksin_code)) {
             echo json_encode(['status' => 'error', 'message' => 'Kode barang dan kode vaksin wajib diisi.']);
@@ -255,7 +256,35 @@ try {
             $stmtCache->execute([':id' => $vaksin_code, ':term' => $vaksin_display]);
         }
 
-        echo json_encode(['status' => 'success', 'message' => 'Mapping vaksin berhasil disimpan.']);
+        // Dual-Save: sinkronkan juga ke satu_sehat_mapping_obat
+        if ($sync_obat) {
+            try {
+                $sqlObat = "INSERT INTO satu_sehat_mapping_obat
+                            (kode_brng, obat_code, obat_system, obat_display, route_code, route_system, route_display)
+                            VALUES (:kb, :oc, :os, :od, :rc, 'http://www.whocc.no/atc', :rd)
+                            ON DUPLICATE KEY UPDATE obat_code=:oc2, obat_display=:od2, route_code=:rc2, route_display=:rd2";
+                $stmtObat = $pdo->prepare($sqlObat);
+                $stmtObat->execute([
+                    ':kb'  => $kode_brng,
+                    ':oc'  => $vaksin_code,
+                    ':os'  => $vaksin_system,
+                    ':od'  => $vaksin_display,
+                    ':rc'  => $route_code,
+                    ':rd'  => $route_display,
+                    ':oc2' => $vaksin_code,
+                    ':od2' => $vaksin_display,
+                    ':rc2' => $route_code,
+                    ':rd2' => $route_display,
+                ]);
+            } catch (Exception $e) {}
+        }
+
+        $msg = 'Mapping vaksin berhasil disimpan.';
+        if ($sync_obat) {
+            $msg .= ' (Tersinkronkan ke Mapping Obat)';
+        }
+
+        echo json_encode(['status' => 'success', 'message' => $msg]);
         exit;
     }
 

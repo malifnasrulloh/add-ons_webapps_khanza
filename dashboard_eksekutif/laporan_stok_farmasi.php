@@ -27,7 +27,20 @@ while($row = $res_bangsal->fetch_assoc()){
     .obat-card .stok-besar { font-size: 1.5rem; font-weight: bold; color: #1cc88a; }
     .obat-card .lokasi { font-size: 0.8rem; color: #858796; }
     /* Fix z-index select2 dalam modal */
+    .modal-body .col-md-4, .modal-body .mb-3 { position: relative; }
     .select2-container--open { z-index: 9999999 !important; }
+    .select2-container--open .select2-dropdown {
+        z-index: 9999999 !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15) !important;
+        overflow: hidden !important;
+    }
+    .select2-container--open .select2-results__options {
+        max-height: 220px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
 </style>
 
 <div class="container-fluid">
@@ -250,6 +263,44 @@ while($row = $res_bangsal->fetch_assoc()){
     }
 
     $(document).ready(function() {
+        // Extension: Selalu posisikan dropdown Select2 tepat di bawah input
+        (function($) {
+            if (!$.fn.select2 || !$.fn.select2.amd) return;
+            try {
+                var AttachBody = $.fn.select2.amd.require('select2/dropdown/attachBody');
+                AttachBody.prototype._positionDropdown = function() {
+                    var offset = this.$container.offset();
+                    if (!offset) return;
+                    var container = {
+                        height: this.$container.outerHeight(false),
+                        top: offset.top,
+                        bottom: offset.top + this.$container.outerHeight(false)
+                    };
+
+                    var $offsetParent = this.$dropdownParent;
+                    if ($offsetParent.css('position') === 'static') {
+                        $offsetParent = $offsetParent.offsetParent();
+                    }
+                    var parentOffset = $offsetParent.offset() || { top: 0, left: 0 };
+
+                    var css = {
+                        left: offset.left - parentOffset.left,
+                        top: container.bottom - parentOffset.top,
+                        width: this.$container.outerWidth(false)
+                    };
+
+                    this.$dropdown
+                        .removeClass('select2-dropdown--above')
+                        .addClass('select2-dropdown--below');
+                    this.$container
+                        .removeClass('select2-container--above')
+                        .addClass('select2-container--below');
+
+                    this.$dropdownContainer.css(css);
+                };
+            } catch (e) {}
+        })(jQuery);
+
         // 1. Inisialisasi Select2 pada Filter Utama
         $('.select2-single').select2({
             theme: "bootstrap-5",
@@ -258,11 +309,13 @@ while($row = $res_bangsal->fetch_assoc()){
         });
 
         // 2. Inisialisasi Select2 pada Modal (dropdownParent penting agar bisa search di dalam modal)
-        $('.select2-modal').select2({
-            theme: "bootstrap-5",
-            placeholder: "Pilih Depo...",
-            allowClear: true,
-            dropdownParent: $('#modalRiwayat') 
+        $('.select2-modal').each(function() {
+            $(this).select2({
+                theme: "bootstrap-5",
+                placeholder: "Pilih Depo...",
+                allowClear: true,
+                dropdownParent: $(this).closest('.col-md-4')
+            });
         });
 
         // 3. Init Table Stok

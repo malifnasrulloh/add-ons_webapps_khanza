@@ -89,6 +89,23 @@ $res_depo = $pdo->query($sql_depo)->fetchAll();
             font-size: 0.9rem;
             border-bottom: 1px solid #f3f4f6;
         }
+
+        /* Fix Select2 inside Modal: pastikan selalu di bawah input, z-index tinggi, dan scrollable */
+        .modal-body .col-md-3 { position: relative; }
+        .select2-container { width: 100% !important; z-index: 1060; }
+        .select2-container--open { z-index: 1065 !important; }
+        .select2-container--open .select2-dropdown {
+            z-index: 1065 !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15) !important;
+            overflow: hidden !important;
+        }
+        .select2-container--open .select2-results__options {
+            max-height: 220px !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
     </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
@@ -288,9 +305,47 @@ $res_depo = $pdo->query($sql_depo)->fetchAll();
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
     };
 
+    // Extension: Selalu posisikan dropdown Select2 tepat di bawah input
+    (function($) {
+        if (!$.fn.select2 || !$.fn.select2.amd) return;
+        try {
+            var AttachBody = $.fn.select2.amd.require('select2/dropdown/attachBody');
+            AttachBody.prototype._positionDropdown = function() {
+                var offset = this.$container.offset();
+                if (!offset) return;
+                var container = {
+                    height: this.$container.outerHeight(false),
+                    top: offset.top,
+                    bottom: offset.top + this.$container.outerHeight(false)
+                };
+
+                var $offsetParent = this.$dropdownParent;
+                if ($offsetParent.css('position') === 'static') {
+                    $offsetParent = $offsetParent.offsetParent();
+                }
+                var parentOffset = $offsetParent.offset() || { top: 0, left: 0 };
+
+                var css = {
+                    left: offset.left - parentOffset.left,
+                    top: container.bottom - parentOffset.top,
+                    width: this.$container.outerWidth(false)
+                };
+
+                this.$dropdown
+                    .removeClass('select2-dropdown--above')
+                    .addClass('select2-dropdown--below');
+                this.$container
+                    .removeClass('select2-container--above')
+                    .addClass('select2-container--below');
+
+                this.$dropdownContainer.css(css);
+            };
+        } catch (e) {}
+    })(jQuery);
+
     $(document).ready(function() {
         $('#pilihDepo').select2({ theme: "bootstrap-5", width: '100%' });
-        $('#riwayatBangsal').select2({ theme: "bootstrap-5", dropdownParent: $('#modalRiwayat') });
+        $('#riwayatBangsal').select2({ theme: "bootstrap-5", dropdownParent: $('#riwayatBangsal').closest('.col-md-3') });
 
         let tableStok = $('#tabel-stok').DataTable({
             processing: true,
