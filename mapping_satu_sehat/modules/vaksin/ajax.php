@@ -288,6 +288,190 @@ try {
         exit;
     }
 
+    // ========================================================
+    // 4. LOAD TABLE PAKET TINDAKAN VAKSIN
+    // ========================================================
+    if ($action === 'load_table_paket') {
+        $sql = "SELECT vt.kd_jenis_prw, jp.nm_perawatan, vt.urutan, vt.kode_brng, d.nama_brng, 
+                       mv.vaksin_code, mv.vaksin_display, vt.posisi_batch, vt.reason_code
+                FROM satu_sehat_mapping_vaksin_tindakan vt
+                LEFT JOIN jns_perawatan jp ON vt.kd_jenis_prw = jp.kd_jenis_prw
+                LEFT JOIN databarang d ON vt.kode_brng = d.kode_brng
+                LEFT JOIN satu_sehat_mapping_vaksin mv ON vt.kode_brng = mv.kode_brng
+                ORDER BY vt.kd_jenis_prw ASC, vt.urutan ASC";
+
+        $stmt = $pdo->query($sql);
+        $data = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $tindakan_info = "<b>" . htmlspecialchars($row['kd_jenis_prw'], ENT_QUOTES, 'UTF-8') . "</b><br>"
+                           . "<span class='text-dark'>" . htmlspecialchars($row['nm_perawatan'] ?? '-', ENT_QUOTES, 'UTF-8') . "</span>";
+
+            $urutan_badge = ($row['urutan'] == 1)
+                ? "<span class='badge bg-primary'>Vaksin Ke-1</span>"
+                : "<span class='badge bg-info text-dark'>Vaksin Ke-" . (int)$row['urutan'] . "</span>";
+
+            $barang_info = "<b>" . htmlspecialchars($row['nama_brng'] ?? '-', ENT_QUOTES, 'UTF-8') . "</b> (" . htmlspecialchars($row['kode_brng'], ENT_QUOTES, 'UTF-8') . ")<br>";
+            if (!empty($row['vaksin_code'])) {
+                $barang_info .= "<span class='badge bg-success'>KFA " . htmlspecialchars($row['vaksin_code'], ENT_QUOTES, 'UTF-8') . "</span> ";
+                $barang_info .= "<small class='text-muted'>" . htmlspecialchars(substr($row['vaksin_display'] ?? '', 0, 40), ENT_QUOTES, 'UTF-8') . "</small>";
+            } else {
+                $barang_info .= "<span class='badge bg-danger'>Barang belum dipetakan ke KFA</span>";
+            }
+
+            $posisi_badge = ($row['posisi_batch'] == 2)
+                ? "<span class='badge bg-warning text-dark'>Batch SOAP Ke-2 (batch2)</span>"
+                : "<span class='badge bg-secondary'>Batch SOAP Utama (batch)</span>";
+
+            $reason_text = "Imunisasi Program";
+            $reason_cls  = "bg-secondary";
+            if ($row['reason_code'] === 'IM-Khusus') {
+                $reason_text = "Program Khusus (Umroh/Haji)";
+                $reason_cls  = "bg-primary";
+            } elseif ($row['reason_code'] === 'IM-Pilihan') {
+                $reason_text = "Imunisasi Pilihan";
+                $reason_cls  = "bg-success";
+            }
+            $reason_badge = "<span class='badge $reason_cls'>$reason_text</span>";
+
+            $row_json = json_encode([
+                'kd_jenis_prw'  => $row['kd_jenis_prw'],
+                'nm_perawatan'  => $row['nm_perawatan'] ?? '',
+                'urutan'        => $row['urutan'],
+                'kode_brng'     => $row['kode_brng'],
+                'nama_brng'     => $row['nama_brng'] ?? '',
+                'posisi_batch'  => $row['posisi_batch'],
+                'reason_code'   => $row['reason_code'],
+            ], JSON_HEX_APOS | JSON_HEX_QUOT);
+
+            $btn = "<button class='btn btn-sm btn-outline-primary btn-edit-paket me-1' data-json='$row_json' title='Edit Mapping'>
+                        <i class='fa fa-edit'></i>
+                    </button>
+                    <button class='btn btn-sm btn-outline-danger btn-delete-paket' data-kd='" . htmlspecialchars($row['kd_jenis_prw'], ENT_QUOTES, 'UTF-8') . "' data-urutan='" . (int)$row['urutan'] . "' title='Hapus'>
+                        <i class='fa fa-trash'></i>
+                    </button>";
+
+            $data[] = [
+                $tindakan_info,
+                $urutan_badge,
+                $barang_info,
+                $posisi_badge,
+                $reason_badge,
+                $btn
+            ];
+        }
+
+        echo json_encode([
+            "draw"            => 1,
+            "recordsTotal"    => count($data),
+            "recordsFiltered" => count($data),
+            "data"            => $data
+        ]);
+        exit;
+    }
+
+    // ========================================================
+    // 5. SEARCH TINDAKAN (jns_perawatan)
+    // ========================================================
+    if ($action === 'search_tindakan') {
+        $q = isset($_GET['q']) ? trim($_GET['q']) : (isset($_GET['term']) ? trim($_GET['term']) : '');
+        $stmt = $pdo->prepare("
+            SELECT kd_jenis_prw AS id,
+                   CONCAT(kd_jenis_prw, ' - ', nm_perawatan) AS text,
+                   nm_perawatan
+            FROM jns_perawatan
+            WHERE status = '1' AND (kd_jenis_prw LIKE :q OR nm_perawatan LIKE :q)
+            ORDER BY nm_perawatan ASC
+            LIMIT 40
+        ");
+        $stmt->execute([':q' => "%$q%"]);
+        echo json_encode(['results' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    // ========================================================
+    // 6. SEARCH BARANG VAKSIN TERPETAKAN
+    // ========================================================
+    if ($action === 'search_barang_vaksin') {
+        $q = isset($_GET['q']) ? trim($_GET['q']) : (isset($_GET['term']) ? trim($_GET['term']) : '');
+        $stmt = $pdo->prepare("
+            SELECT d.kode_brng AS id,
+                   CONCAT(d.kode_brng, ' - ', d.nama_brng, ' [KFA: ', IFNULL(mv.vaksin_code, '-'), ']') AS text,
+                   d.nama_brng,
+                   mv.vaksin_code,
+                   mv.vaksin_display
+            FROM databarang d
+            INNER JOIN satu_sehat_mapping_vaksin mv ON d.kode_brng = mv.kode_brng
+            WHERE d.status = '1' AND (d.kode_brng LIKE :q OR d.nama_brng LIKE :q OR mv.vaksin_code LIKE :q OR mv.vaksin_display LIKE :q)
+            ORDER BY d.nama_brng ASC
+            LIMIT 40
+        ");
+        $stmt->execute([':q' => "%$q%"]);
+        echo json_encode(['results' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    // ========================================================
+    // 7. SAVE MAPPING PAKET
+    // ========================================================
+    if ($action === 'save_mapping_paket') {
+        validate_csrf();
+
+        $kd_jenis_prw = trim($_POST['kd_jenis_prw'] ?? '');
+        $urutan       = (int)($_POST['urutan'] ?? 1);
+        $kode_brng    = trim($_POST['kode_brng'] ?? '');
+        $posisi_batch = (int)($_POST['posisi_batch'] ?? 1);
+        $reason_code  = trim($_POST['reason_code'] ?? 'IM-Khusus');
+
+        if (empty($kd_jenis_prw) || empty($kode_brng)) {
+            echo json_encode(['status' => 'error', 'message' => 'Pilih tindakan perawatan dan barang vaksin terlebih dahulu.']);
+            exit;
+        }
+
+        if ($urutan < 1) $urutan = 1;
+        if (!in_array($posisi_batch, [1, 2], true)) $posisi_batch = 1;
+        if (!in_array($reason_code, ['IM-Khusus', 'IM-Pilihan', 'IM-Program'], true)) $reason_code = 'IM-Khusus';
+
+        $sql = "INSERT INTO satu_sehat_mapping_vaksin_tindakan (kd_jenis_prw, urutan, kode_brng, posisi_batch, reason_code)
+                VALUES (:kd, :urutan, :kb, :pb, :rc)
+                ON DUPLICATE KEY UPDATE kode_brng = :kb2, posisi_batch = :pb2, reason_code = :rc2";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':kd'      => $kd_jenis_prw,
+            ':urutan'  => $urutan,
+            ':kb'      => $kode_brng,
+            ':pb'      => $posisi_batch,
+            ':rc'      => $reason_code,
+            ':kb2'     => $kode_brng,
+            ':pb2'     => $posisi_batch,
+            ':rc2'     => $reason_code
+        ]);
+
+        echo json_encode(['status' => 'success', 'message' => 'Mapping paket tindakan vaksin berhasil disimpan.']);
+        exit;
+    }
+
+    // ========================================================
+    // 8. DELETE MAPPING PAKET
+    // ========================================================
+    if ($action === 'delete_mapping_paket') {
+        validate_csrf();
+
+        $kd_jenis_prw = trim($_POST['kd_jenis_prw'] ?? '');
+        $urutan       = (int)($_POST['urutan'] ?? 1);
+
+        if (empty($kd_jenis_prw)) {
+            echo json_encode(['status' => 'error', 'message' => 'Kode jenis perawatan tidak valid.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM satu_sehat_mapping_vaksin_tindakan WHERE kd_jenis_prw = :kd AND urutan = :urutan");
+        $stmt->execute([':kd' => $kd_jenis_prw, ':urutan' => $urutan]);
+
+        echo json_encode(['status' => 'success', 'message' => 'Mapping paket tindakan berhasil dihapus.']);
+        exit;
+    }
+
 } catch (Exception $e) {
     echo json_encode(["draw"=>1,"recordsTotal"=>0,"recordsFiltered"=>0,"data"=>[],"error"=>$e->getMessage()]);
 }

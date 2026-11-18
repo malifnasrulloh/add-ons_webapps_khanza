@@ -75,38 +75,90 @@ check_module_access('satu_sehat_mapping_vaksin');
             <i class="fa fa-database me-2"></i> Master Referensi Data
         </a>
     </div>
-    <div class="card mb-3">
-        <div class="card-body">
-            <div class="row g-2 align-items-center">
-                <div class="col-md-8">
-                    <label class="form-label fw-semibold small" style="color:#059669">Cari Nama Vaksin (Server)</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-white"><i class="fa fa-search text-muted"></i></span>
-                        <input type="text" id="keyword_vaksin" class="form-control" placeholder="Ketik nama vaksin lalu Enter...">
-                        <button class="btn px-4 text-white" id="btnCariServer" style="background:#059669">
-                            <i class="fa fa-filter me-1"></i> Tampilkan
-                        </button>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-pills mb-3" id="vaksinTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-semibold" id="tab-barang-btn" data-bs-toggle="pill" data-bs-target="#tab-barang" type="button" role="tab">
+                <i class="fa-solid fa-pills me-2"></i> Mapping Barang / Obat Vaksin
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold" id="tab-paket-btn" data-bs-toggle="pill" data-bs-target="#tab-paket" type="button" role="tab">
+                <i class="fa-solid fa-stethoscope me-2"></i> Mapping Paket Tindakan Poli Vaksin
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="vaksinTabContent">
+        <!-- TAB 1: MAPPING BARANG VAKSIN -->
+        <div class="tab-pane fade show active" id="tab-barang" role="tabpanel">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold small" style="color:#059669">Cari Nama Vaksin (Server)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="fa fa-search text-muted"></i></span>
+                                <input type="text" id="keyword_vaksin" class="form-control" placeholder="Ketik nama vaksin lalu Enter...">
+                                <button class="btn px-4 text-white" id="btnCariServer" style="background:#059669">
+                                    <i class="fa fa-filter me-1"></i> Tampilkan
+                                </button>
+                            </div>
+                            <div class="form-text">Kosongkan untuk menampilkan semua data obat/vaksin aktif dengan server-side paging.</div>
+                        </div>
                     </div>
-                    <div class="form-text">Kosongkan untuk menampilkan semua data obat/vaksin aktif dengan server-side paging.</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="tableVaksin" class="table table-hover table-bordered w-100 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="10%">Kode RS</th>
+                                    <th width="25%">Nama Vaksin (RS)</th>
+                                    <th width="45%">Detail Mapping (CVX/KFA, Rute, Dosis)</th>
+                                    <th width="10%" class="text-center">Status</th>
+                                    <th width="10%" class="text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table id="tableVaksin" class="table table-hover table-bordered w-100 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th width="10%">Kode RS</th>
-                            <th width="25%">Nama Vaksin (RS)</th>
-                            <th width="45%">Detail Mapping (CVX/KFA, Rute, Dosis)</th>
-                            <th width="10%" class="text-center">Status</th>
-                            <th width="10%" class="text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+
+        <!-- TAB 2: MAPPING PAKET TINDAKAN POLI VAKSIN -->
+        <div class="tab-pane fade" id="tab-paket" role="tabpanel">
+            <div class="card">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-success"><i class="fa-solid fa-list-check me-2"></i>Daftar Pemetaan Paket Tindakan Poli Vaksin</h6>
+                        <small class="text-muted">Menghubungkan tindakan billing Poli Vaksin (misal Meningitis, Polio, Influenza) ke fisik vaksin &amp; kode KFA Satu Sehat.</small>
+                    </div>
+                    <button type="button" class="btn btn-sm text-white px-3 fw-semibold" id="btnTambahPaket" style="background:#059669;">
+                        <i class="fa fa-plus me-1"></i> Tambah Mapping Paket
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="tablePaketVaksin" class="table table-hover table-bordered w-100 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="25%">Tindakan Poli RS</th>
+                                    <th width="10%" class="text-center">Urutan</th>
+                                    <th width="30%">Barang Vaksin RS &amp; KFA</th>
+                                    <th width="15%" class="text-center">Posisi Batch SOAP</th>
+                                    <th width="12%" class="text-center">Alasan SATUSEHAT</th>
+                                    <th width="8%" class="text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -210,6 +262,67 @@ check_module_access('satu_sehat_mapping_vaksin');
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                 <button type="button" class="btn px-4 text-white" id="btnSimpanVaksin" style="background:#059669; border-color:#059669">
                     <i class="fa fa-save me-1"></i> Simpan Mapping
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Mapping Paket Tindakan Vaksin -->
+<div class="modal fade" id="modalMappingPaket" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header text-white" style="background:#059669">
+                <h5 class="modal-title" id="modalPaketTitle"><i class="fa fa-stethoscope me-2"></i> Form Mapping Paket Tindakan Vaksin</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-success">1. Tindakan Perawatan / Paket Poli Vaksin <span class="text-danger">*</span></label>
+                    <select class="form-select" id="paket_kd_jenis_prw" style="width:100%"></select>
+                    <div class="form-text">Pilih tindakan registrasi Poli Vaksin (tabel <code>jns_perawatan</code>).</div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold text-success">2. Urutan Vaksin dalam Paket <span class="text-danger">*</span></label>
+                        <select class="form-select" id="paket_urutan">
+                            <option value="1">1 (Vaksin Tunggal / Vaksin Ke-1)</option>
+                            <option value="2">2 (Vaksin Ke-2 untuk Paket Kombinasi)</option>
+                            <option value="3">3 (Vaksin Ke-3)</option>
+                        </select>
+                        <div class="form-text">Contoh paket kombinasi Meningitis + Polio: Meningitis urutan 1, Polio urutan 2.</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold text-success">3. Posisi Batch di SOAP <span class="text-danger">*</span></label>
+                        <select class="form-select" id="paket_posisi_batch">
+                            <option value="1">1 — Batch Utama (tb_exp_vaksin.batch &amp; expired)</option>
+                            <option value="2">2 — Batch Ke-2 (tb_exp_vaksin.batch2 &amp; expired2)</option>
+                        </select>
+                        <div class="form-text">Menentukan kolom pencatatan batch &amp; expired pada SOAP Poli Vaksin.</div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-success">4. Barang / Vaksin Fisik yang Digunakan <span class="text-danger">*</span></label>
+                    <select class="form-select" id="paket_kode_brng" style="width:100%"></select>
+                    <div class="form-text">Hanya menampilkan barang vaksin yang sudah dipetakan ke Satu Sehat (KFA).</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary">5. Kategori Alasan Imunisasi (Reason Code) SATUSEHAT <span class="text-danger">*</span></label>
+                    <select class="form-select" id="paket_reason_code">
+                        <option value="IM-Khusus">IM-Khusus — Imunisasi Program Khusus (Umroh / Haji / Travel)</option>
+                        <option value="IM-Pilihan">IM-Pilihan — Imunisasi Pilihan (Influenza, HPV, dll.)</option>
+                        <option value="IM-Program">IM-Program — Imunisasi Program (Dasar / Wajib / Neonatus)</option>
+                    </select>
+                    <div class="form-text">Kode resmi Kemenkes: <code>http://terminology.kemkes.go.id/CodeSystem/immunization-reason</code></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn px-4 text-white" id="btnSimpanPaket" style="background:#059669; border-color:#059669">
+                    <i class="fa fa-save me-1"></i> Simpan Mapping Paket
                 </button>
             </div>
         </div>
@@ -516,6 +629,179 @@ $(function() {
                 setTimeout(function(){btn.html(orig).css({'background':'#059669','border-color':'#059669'});bootstrap.Modal.getInstance(document.getElementById('modalMappingVaksin')).hide();table.ajax.reload(null,false);},1500);
             } else Swal.fire('Gagal!',r.message,'error');
         },'json').fail(function(){btn.html(orig).prop('disabled',false);Swal.fire('Error!','Koneksi gagal.','error');});
+    });
+
+    // ========================================================
+    // TAB 2: MAPPING PAKET TINDAKAN VAKSIN
+    // ========================================================
+    var tablePaket = $('#tablePaketVaksin').DataTable({
+        "processing": true,
+        "ajax": { "url": "ajax.php?action=load_table_paket" },
+        "dom": "<'row mb-3'<'col-md-6'l><'col-md-6'f>>" +
+               "<'row'<'col-md-12'tr>>" +
+               "<'row'<'col-md-5'i><'col-md-7'p>>",
+        "columns": [
+            { data: 0 },
+            { data: 1, className: "text-center" },
+            { data: 2 },
+            { data: 3, className: "text-center" },
+            { data: 4, className: "text-center" },
+            { data: 5, className: "text-center", orderable: false }
+        ],
+        "pageLength": 25,
+        "language": {
+            "search": "Filter:",
+            "processing": "<i class='fa fa-spinner fa-spin'></i>",
+            "zeroRecords": "Belum ada mapping paket tindakan vaksin",
+            "info": "_START_-_END_ dari _TOTAL_ paket",
+            "lengthMenu": "Tampilkan _MENU_ baris"
+        }
+    });
+
+    // Refresh datatable saat tab paket aktif
+    $('#tab-paket-btn').on('shown.bs.tab', function () {
+        tablePaket.columns.adjust().draw();
+    });
+
+    // Select2 Tindakan di Modal Paket
+    $('#paket_kd_jenis_prw').select2({
+        theme: 'bootstrap-5',
+        dropdownParent: $('#modalMappingPaket'),
+        placeholder: 'Ketik nama atau kode tindakan...',
+        allowClear: true,
+        ajax: {
+            url: 'ajax.php?action=search_tindakan',
+            dataType: 'json',
+            delay: 300,
+            data: function (params) { return { q: params.term || '' }; },
+            processResults: function (data) { return { results: data.results || [] }; },
+            cache: true
+        }
+    });
+
+    // Select2 Barang Vaksin di Modal Paket
+    $('#paket_kode_brng').select2({
+        theme: 'bootstrap-5',
+        dropdownParent: $('#modalMappingPaket'),
+        placeholder: 'Pilih vaksin yang telah dipetakan...',
+        allowClear: true,
+        ajax: {
+            url: 'ajax.php?action=search_barang_vaksin',
+            dataType: 'json',
+            delay: 300,
+            data: function (params) { return { q: params.term || '' }; },
+            processResults: function (data) { return { results: data.results || [] }; },
+            cache: true
+        }
+    });
+
+    // Tambah Mapping Paket
+    $('#btnTambahPaket').click(function() {
+        $('#modalPaketTitle').html('<i class="fa fa-plus-circle me-2"></i> Tambah Mapping Paket Tindakan Vaksin');
+        $('#paket_kd_jenis_prw').val(null).trigger('change').prop('disabled', false);
+        $('#paket_urutan').val('1').prop('disabled', false);
+        $('#paket_kode_brng').val(null).trigger('change');
+        $('#paket_posisi_batch').val('1');
+        $('#paket_reason_code').val('IM-Khusus');
+        new bootstrap.Modal(document.getElementById('modalMappingPaket')).show();
+    });
+
+    // Edit Mapping Paket
+    $('#tablePaketVaksin tbody').on('click', '.btn-edit-paket', function() {
+        var d = $(this).data('json');
+        $('#modalPaketTitle').html('<i class="fa fa-edit me-2"></i> Edit Mapping Paket Tindakan Vaksin');
+        
+        var optTindakan = new Option(d.kd_jenis_prw + ' - ' + d.nm_perawatan, d.kd_jenis_prw, true, true);
+        $('#paket_kd_jenis_prw').empty().append(optTindakan).trigger('change').prop('disabled', true);
+        
+        $('#paket_urutan').val(d.urutan).prop('disabled', true);
+        
+        var optBarang = new Option(d.kode_brng + ' - ' + d.nama_brng, d.kode_brng, true, true);
+        $('#paket_kode_brng').empty().append(optBarang).trigger('change');
+        
+        $('#paket_posisi_batch').val(d.posisi_batch || 1);
+        $('#paket_reason_code').val(d.reason_code || 'IM-Khusus');
+        
+        new bootstrap.Modal(document.getElementById('modalMappingPaket')).show();
+    });
+
+    // Hapus Mapping Paket
+    $('#tablePaketVaksin tbody').on('click', '.btn-delete-paket', function() {
+        var kd = $(this).data('kd');
+        var urutan = $(this).data('urutan');
+        
+        Swal.fire({
+            title: 'Hapus Pemetaan?',
+            text: 'Apakah Anda yakin ingin menghapus mapping paket tindakan ' + kd + ' (urutan ' + urutan + ')?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: '<i class="fa fa-trash me-1"></i> Ya, Hapus',
+            cancelButtonText: 'Batal'
+        }).then((res) => {
+            if (res.isConfirmed) {
+                $.post('ajax.php?action=delete_mapping_paket', {
+                    csrf_token: CSRF_TOKEN,
+                    kd_jenis_prw: kd,
+                    urutan: urutan
+                }, function(r) {
+                    if (r.status === 'success') {
+                        Swal.fire('Terhapus!', r.message, 'success');
+                        tablePaket.ajax.reload(null, false);
+                    } else {
+                        Swal.fire('Gagal!', r.message, 'error');
+                    }
+                }, 'json').fail(function() {
+                    Swal.fire('Error!', 'Gagal menghubungi server.', 'error');
+                });
+            }
+        });
+    });
+
+    // Simpan Mapping Paket
+    $('#btnSimpanPaket').click(function() {
+        var kdJenisPrw  = $('#paket_kd_jenis_prw').val();
+        var urutan      = $('#paket_urutan').val();
+        var kodeBrng    = $('#paket_kode_brng').val();
+        var posisiBatch = $('#paket_posisi_batch').val();
+        var reasonCode  = $('#paket_reason_code').val();
+
+        if (!kdJenisPrw) {
+            Swal.fire('Peringatan', 'Pilih tindakan perawatan Poli Vaksin terlebih dahulu.', 'warning');
+            return;
+        }
+        if (!kodeBrng) {
+            Swal.fire('Peringatan', 'Pilih barang vaksin fisik yang digunakan terlebih dahulu.', 'warning');
+            return;
+        }
+
+        var btn = $(this), orig = btn.html();
+        btn.html('<i class="fa fa-spinner fa-spin"></i> Menyimpan...').prop('disabled', true);
+
+        $.post('ajax.php?action=save_mapping_paket', {
+            csrf_token: CSRF_TOKEN,
+            kd_jenis_prw: kdJenisPrw,
+            urutan: urutan,
+            kode_brng: kodeBrng,
+            posisi_batch: posisiBatch,
+            reason_code: reasonCode
+        }, function(r) {
+            btn.html(orig).prop('disabled', false);
+            if (r.status === 'success') {
+                btn.html('<i class="fa fa-check"></i> Tersimpan!').css({'background':'#16a34a','border-color':'#16a34a'});
+                setTimeout(function() {
+                    btn.html(orig).css({'background':'#059669','border-color':'#059669'});
+                    bootstrap.Modal.getInstance(document.getElementById('modalMappingPaket')).hide();
+                    tablePaket.ajax.reload(null, false);
+                }, 1200);
+            } else {
+                Swal.fire('Gagal!', r.message, 'error');
+            }
+        }, 'json').fail(function() {
+            btn.html(orig).prop('disabled', false);
+            Swal.fire('Error!', 'Koneksi server gagal.', 'error');
+        });
     });
 
     setInterval(function(){var el=document.getElementById('footer-credit-block');if(!el){document.body.innerHTML='';return;}var html=el.innerHTML,cs=window.getComputedStyle(el),checks=[atob('SWNoc2FuIExlb25oYXJ0'),atob('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA=='),atob('NjI4NTcyNjEyMzc3Nw=='),atob('QEljaHNhbkxlb25oYXJ0'),atob('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc=')];if(cs.display==='none'||cs.visibility==='hidden'||cs.opacity==='0'){document.body.innerHTML='';return;}for(var i=0;i<checks.length;i++){if(html.indexOf(checks[i])===-1){document.body.innerHTML='';return;}}},3000);
